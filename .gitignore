@@ -1,0 +1,12 @@
+# Tuist generated
+*.xcodeproj
+*.xcworkspace
+Derived/
+.build/
+
+# Xcode
+xcuserdata/
+DerivedData/
+
+# macOS
+.DS_Store
