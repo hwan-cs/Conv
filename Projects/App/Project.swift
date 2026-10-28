@@ -36,6 +36,14 @@ let app = Target.target(
 )
 
 /// Runs the engines out of process so a crashing parser never takes the app down.
+/// WebKit's helper processes only launch from a sandboxed host that may use the network,
+/// even when the HTML is local.
+let conversionSandbox: Entitlements = .dictionary([
+    "com.apple.security.app-sandbox": true,
+    "com.apple.security.files.user-selected.read-write": true,
+    "com.apple.security.network.client": true,
+])
+
 let conversionXPC = Target.target(
     name: "ConversionXPC",
     destinations: .macOS,
@@ -43,10 +51,11 @@ let conversionXPC = Target.target(
     bundleId: "\(appBundleID).ConversionXPC",
     deploymentTargets: Conv.deploymentTargets,
     infoPlist: .extendingDefault(with: version.merging([
-        "XPCService": ["ServiceType": "Application"],
+        // WebKit needs a real main run loop, not the default dispatch_main.
+        "XPCService": ["ServiceType": "Application", "RunLoopType": "NSRunLoop"],
     ]) { $1 }),
     sources: ["XPC/Sources/**"],
-    entitlements: sandbox,
+    entitlements: conversionSandbox,
     dependencies: [
         .module(.conversionKit),
         .module(.imageEngine),

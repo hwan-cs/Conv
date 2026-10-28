@@ -3,6 +3,10 @@ import Foundation
 /// XPC interface between the app and the ConversionXPC service.
 @objc public protocol ConversionServiceProtocol {
     func ping(withReply reply: @escaping @Sendable (String) -> Void)
+
+    /// P1 spike: paginate HTML into an A4 PDF inside the sandboxed service. Replies with the PDF
+    /// or an error description.
+    func renderPDF(fromHTML html: String, withReply reply: @escaping @Sendable (Data?, String?) -> Void)
 }
 
 public enum ConversionService {

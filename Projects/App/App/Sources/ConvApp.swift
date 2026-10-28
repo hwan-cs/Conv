@@ -8,6 +8,11 @@ import SwiftUI
 struct ConvApp: App {
     init() {
         ConvFont.register()
+        #if DEBUG
+        if XPCSpike.isRequested {
+            DispatchQueue.main.async { XPCSpike.run() }
+        }
+        #endif
     }
 
     var body: some Scene {

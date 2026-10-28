@@ -4,7 +4,7 @@ import Testing
 @testable import DocumentEngine
 
 @MainActor
-@Suite struct PagedPDFRendererTests {
+@Suite(.timeLimit(.minutes(1))) struct PagedPDFRendererTests {
     /// ~120 Korean paragraphs, then a heading forced onto a new page.
     static let longHTML: String = {
         let paragraphs = (1...120).map { index in
@@ -47,6 +47,14 @@ import Testing
         }
         let pageText = try #require(markerPage.flatMap { document.page(at: $0)?.string })
         #expect(pageText.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("BREAK-MARKER"))
+    }
+
+    @Test func printThatOutlivesTheTimeoutThrowsAndLeavesNoFile() async throws {
+        let output = try Self.outputURL("timeout.pdf")
+        await #expect(throws: PagedPDFRenderer.RenderError.timedOut) {
+            try await PagedPDFRenderer().render(html: Self.longHTML, baseURL: nil, to: output, timeout: .milliseconds(1))
+        }
+        #expect(!FileManager.default.fileExists(atPath: output.path))
     }
 
     private static func outputURL(_ name: String) throws -> URL {
