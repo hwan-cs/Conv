@@ -1,24 +1,25 @@
 import SwiftUI
 
-/// An output format choice drawn as a keyboard key. Pressing it (or its number key) sinks the cap.
+/// An output format choice drawn as a keyboard key. Pressing it (or its number key) sinks the cap;
+/// the selected choice is the yellow, raised one.
 public struct Keycap: View {
     let ext: String
     let caption: String
     let key: Character
-    let isRecommended: Bool
+    let isSelected: Bool
     let action: () -> Void
 
     public init(
         ext: String,
         caption: String,
         key: Character,
-        isRecommended: Bool = false,
+        isSelected: Bool = false,
         action: @escaping () -> Void
     ) {
         self.ext = ext
         self.caption = caption
         self.key = key
-        self.isRecommended = isRecommended
+        self.isSelected = isSelected
         self.action = action
     }
 
@@ -33,31 +34,31 @@ public struct Keycap: View {
                     KeyHint(String(key), emphasized: true)
                 }
                 Text(caption)
-                    .font(ConvFont.sans(12, isRecommended ? .semibold : .regular))
-                    .foregroundStyle(isRecommended ? Color(hex: 0x5A4300) : ConvColor.muted)
+                    .font(ConvFont.sans(12, isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Color(hex: 0x5A4300) : ConvColor.muted)
             }
             .foregroundStyle(ConvColor.ink)
         }
-        .buttonStyle(KeycapButtonStyle(isRecommended: isRecommended))
+        .buttonStyle(KeycapButtonStyle(isSelected: isSelected))
         .keyboardShortcut(KeyEquivalent(key), modifiers: [])
     }
 }
 
 public struct KeycapButtonStyle: ButtonStyle {
-    let isRecommended: Bool
+    let isSelected: Bool
 
-    public init(isRecommended: Bool = false) {
-        self.isRecommended = isRecommended
+    public init(isSelected: Bool = false) {
+        self.isSelected = isSelected
     }
 
     public func makeBody(configuration: Configuration) -> some View {
-        let depth: CGFloat = isRecommended ? 6 : 4
+        let depth: CGFloat = isSelected ? 6 : 4
         let shape = RoundedRectangle(cornerRadius: 12)
         configuration.label
             .padding(.vertical, 14)
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(shape.fill(isRecommended ? StickerStyle.forExtension("jpg").fill : ConvColor.white))
+            .background(shape.fill(isSelected ? StickerStyle.forExtension("jpg").fill : ConvColor.white))
             .inkBorder(cornerRadius: 12)
             .contentShape(shape)
             .offset(y: configuration.isPressed ? depth : 0)

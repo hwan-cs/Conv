@@ -129,59 +129,145 @@ private struct DragOverScreen: View {
 
 private struct PickScreen: View {
     let model: DropModel
+    /// Picking a format only selects it; converting waits for the confirmation below.
+    @State private var selected: Formats.Output?
 
     private var primaries: [Formats.Output] { model.outputs.filter(\.isPrimary) }
     private var others: [Formats.Output] { model.outputs.filter { !$0.isPrimary } }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 28) {
-            FileCard(items: model.items)
-                .frame(width: 200)
-            Image(systemName: "arrow.right")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(ConvColor.ink)
-            VStack(alignment: .leading, spacing: 14) {
-                Text("무엇으로 바꿀까요?")
-                    .font(ConvFont.sans(24, .heavy))
-                    .tracking(-0.5)
+        VStack(spacing: 16) {
+            HStack(alignment: .center, spacing: 28) {
+                FileCard(items: model.items)
+                    .frame(width: 200)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(ConvColor.ink)
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 18) {
-                    ForEach(Array(primaries.enumerated()), id: \.element.id) { index, output in
-                        Keycap(
-                            ext: output.ext,
-                            caption: output.caption,
-                            key: Character(String(index + 1)),
-                            isRecommended: index == 0
-                        ) {
-                            model.choose(output)
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("무엇으로 바꿀까요?")
+                        .font(ConvFont.sans(24, .heavy))
+                        .tracking(-0.5)
+                        .foregroundStyle(ConvColor.ink)
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 18) {
+                        ForEach(Array(primaries.enumerated()), id: \.element.id) { index, output in
+                            Keycap(
+                                ext: output.ext,
+                                caption: output.caption,
+                                key: Character(String(index + 1)),
+                                isSelected: selected == output
+                            ) {
+                                selected = output
+                            }
                         }
                     }
-                }
-                if !others.isEmpty {
-                    HStack(spacing: 8) {
-                        Text("더 보기")
-                            .font(ConvFont.sans(12, .semibold))
-                            .foregroundStyle(ConvColor.ink)
-                        ForEach(others) { output in
-                            Button(StickerStyle.label(for: output.ext)) { model.choose(output) }
+                    if !others.isEmpty {
+                        HStack(spacing: 8) {
+                            Text("더 보기")
+                                .font(ConvFont.sans(12, .semibold))
+                                .foregroundStyle(ConvColor.ink)
+                            ForEach(others) { output in
+                                Button {
+                                    selected = output
+                                } label: {
+                                    Text(StickerStyle.label(for: output.ext))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 5)
+                                                .fill(selected == output ? StickerStyle.forExtension("jpg").fill : .clear)
+                                        )
+                                }
                                 .buttonStyle(.plain)
                                 .font(ConvFont.mono(12, .bold))
-                                .foregroundStyle(ConvColor.muted)
+                                .foregroundStyle(selected == output ? ConvColor.ink : ConvColor.muted)
                                 .help(output.caption)
+                            }
                         }
                     }
                 }
+                .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxHeight: .infinity)
+            ConfirmBar(model: model, selected: selected) {
+                if let selected { model.choose(selected) }
+            } cancel: {
+                // Esc first drops the selection, then leaves the screen.
+                if selected != nil { selected = nil } else { model.reset() }
+            }
         }
-        .frame(maxHeight: .infinity)
-        .overlay(alignment: .bottomTrailing) {
-            Button("취소") { model.reset() }
-                .keyboardShortcut(.cancelAction)
-                .buttonStyle(.plain)
-                .font(ConvFont.sans(12))
-                .foregroundStyle(ConvColor.muted)
+        .animation(ConvMotion.keyPress, value: selected)
+    }
+}
+
+/// "photo.heic를 .JPG로 바꿀까요?" with the buttons that start or back out of it.
+private struct ConfirmBar: View {
+    let model: DropModel
+    let selected: Formats.Output?
+    let confirm: () -> Void
+    let cancel: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(question)
+                    .font(ConvFont.sans(14, .semibold))
+                    .foregroundStyle(ConvColor.ink)
+                Text(detail)
+                    .font(ConvFont.sans(12))
+                    .foregroundStyle(ConvColor.muted)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            Button(action: cancel) {
+                Text(selected == nil ? "취소" : "다시 고르기")
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(ConvColor.white))
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(ConvColor.ink, lineWidth: 1.5))
+                    .foregroundStyle(ConvColor.ink)
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.cancelAction)
+            Button(action: confirm) {
+                HStack(spacing: 6) {
+                    Text("바꾸기")
+                    KeyHint("⏎", onInk: true)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(RoundedRectangle(cornerRadius: 10).fill(selected == nil ? ConvColor.muted : ConvColor.ink))
+                .foregroundStyle(ConvColor.white)
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.defaultAction)
+            .disabled(selected == nil)
         }
+        .font(ConvFont.sans(13, .semibold))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(selected == nil ? ConvColor.paper2 : ConvColor.white))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(selected == nil ? ConvColor.line : ConvColor.ink, lineWidth: 1.5))
+    }
+
+    private var subject: String {
+        guard let first = model.items.first else { return "" }
+        return model.items.count == 1 ? first.name : "\(model.items.count)개 파일"
+    }
+
+    private var question: String {
+        guard let selected else { return "바꿀 형식을 고르세요" }
+        // File names end in Latin letters, so the sentence avoids a particle after them.
+        return "\(subject) → \(StickerStyle.label(for: selected.ext)), 이대로 바꿀까요?"
+    }
+
+    private var detail: String {
+        guard let selected else { return "숫자 키나 클릭으로 고른 뒤, 한 번 더 확인해요." }
+        if model.items.count == 1, let first = model.items.first {
+            let name = first.url.deletingPathExtension().appendingPathExtension(selected.ext).lastPathComponent
+            return "원본은 그대로 두고, 옆에 저장돼요: \(name)"
+        }
+        return "원본은 그대로 두고, 각 파일 옆에 저장돼요."
     }
 }
 
