@@ -16,18 +16,18 @@ let sandbox: Entitlements = .dictionary([
 /// them. `NSIsRelatedItemType` is what lets the sandboxed app create "보고서.pdf" next to "보고서.docx".
 let documentTypes: Plist.Value = [
     [
-        "CFBundleTypeName": "Convertible Document",
+        "CFBundleTypeName": "Convertible File",
         "CFBundleTypeRole": "Viewer",
         "LSHandlerRank": "None",
-        "LSItemContentTypes": ["org.openxmlformats.wordprocessingml.document"],
-        "CFBundleTypeExtensions": ["docx", "hwp", "hwpx"],
+        "LSItemContentTypes": ["org.openxmlformats.wordprocessingml.document", "public.image"],
+        "CFBundleTypeExtensions": ["docx", "hwp", "hwpx", "heic", "heif", "jpg", "jpeg", "png", "webp", "tiff", "tif", "gif", "bmp", "avif"],
     ],
     [
-        "CFBundleTypeName": "PDF Output",
+        "CFBundleTypeName": "Converted File",
         "CFBundleTypeRole": "Editor",
         "LSHandlerRank": "None",
-        "LSItemContentTypes": ["com.adobe.pdf"],
-        "CFBundleTypeExtensions": ["pdf"],
+        "LSItemContentTypes": ["com.adobe.pdf", "public.jpeg", "public.png", "public.heic", "public.tiff", "com.compuserve.gif", "com.microsoft.bmp", "public.avif"],
+        "CFBundleTypeExtensions": ["pdf", "jpg", "png", "heic", "tiff", "gif", "bmp", "avif"],
         "NSIsRelatedItemType": true,
     ],
 ]

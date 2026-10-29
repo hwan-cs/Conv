@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import ConversionKit
 import Observation
 import Platform
@@ -27,6 +28,8 @@ public final class DropModel {
         public let id = UUID()
         public let url: URL
         public let size: Int64?
+        /// A small preview for images.
+        public var thumbnail: CGImage?
         public var status: Status = .waiting
 
         public var name: String { url.lastPathComponent }
@@ -69,12 +72,14 @@ public final class DropModel {
         let files = urls.filter { !$0.hasDirectoryPath }
         guard !files.isEmpty else { return }
         items = files.map { url in
-            let size = withAccess(url) { (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init) }
-            return Item(url: url, size: size ?? nil)
+            withAccess(url) {
+                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init)
+                return Item(url: url, size: size, thumbnail: Self.thumbnail(of: url))
+            }
         }
         if outputs.isEmpty {
             let kinds = Set(items.map { "." + $0.ext.uppercased() }).sorted().joined(separator: ", ")
-            notice = "\(kinds) 파일은 아직 바꿀 수 없어요. 지금은 DOCX, HWP, HWPX → PDF를 지원해요."
+            notice = "\(kinds) 파일은 아직 바꿀 수 없어요. 지금은 문서(DOCX, HWP, HWPX)와 이미지(HEIC, JPG, PNG, WebP 등)를 바꿀 수 있어요."
             items = []
             phase = .empty
             return
@@ -143,6 +148,17 @@ public final class DropModel {
         panel.message = "같은 이름의 파일이 있어요. 어디에 저장할까요?"
         if let type = UTType(filenameExtension: output.ext) { panel.allowedContentTypes = [type] }
         return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    private static func thumbnail(of url: URL) -> CGImage? {
+        guard Formats.imageInputs.contains(url.pathExtension.lowercased()),
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 400,
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
     /// Files from the open panel are security-scoped; dropped files are granted as they arrive.

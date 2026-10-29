@@ -1,5 +1,6 @@
 import ConversionKit
 import DocumentEngine
+import ImageEngine
 import Foundation
 
 final class ConversionServiceImpl: NSObject, ConversionServiceProtocol {
@@ -43,6 +44,8 @@ extension ConversionServiceImpl {
                 let output = work.appending(path: "output.\(format)")
                 try data.write(to: input)
                 switch (ext, format) {
+                case _ where Formats.imageInputs.contains(ext):
+                    try ImageConverter().convert(input, to: output)
                 case ("docx", "pdf"):
                     try await DocxPDFConverter().convert(input, to: output)
                 case ("hwp", "pdf"), ("hwpx", "pdf"):
@@ -66,6 +69,8 @@ extension ConversionServiceImpl {
         case HwpPDFConverter.ConversionError.passwordProtected: "암호가 걸린 HWP는 바꿀 수 없어요"
         case HwpPDFConverter.ConversionError.unsupportedVersion(let version): "HWP \(version) 형식은 아직 못 읽어요"
         case HwpPDFConverter.ConversionError.unreadableDocument: "HWP 파일이 아니거나 손상됐어요"
+        case ImageConverter.ConversionError.unreadable: "이미지를 읽을 수 없어요"
+        case ImageConverter.ConversionError.unsupportedOutput(let ext): "\(ext.uppercased())로는 아직 저장할 수 없어요"
         default: "변환하지 못했어요 (\(error))"
         }
     }

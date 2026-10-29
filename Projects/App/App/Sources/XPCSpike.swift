@@ -41,8 +41,8 @@ enum XPCSpike {
         }
     }
 
-    /// `Conv --spike-convert`: converts every file in the app's `conv-spike/in` directory to PDF
-    /// through the service and writes each beside its original, logging to `convert.log`.
+    /// `Conv --spike-convert`: converts every file in the app's `conv-spike/in` directory to its
+    /// recommended format through the service and writes each beside its original, logging to `convert.log`.
     static var isConvertRequested: Bool { CommandLine.arguments.contains("--spike-convert") }
 
     @MainActor
@@ -53,11 +53,12 @@ enum XPCSpike {
             let client = ConversionClient()
             var lines: [String] = []
             let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
-            for file in files where file.pathExtension != "pdf" {
+            for file in files where !Formats.outputs(for: file).isEmpty {
                 let started = Date()
                 do {
-                    let pdf = try await client.convert(try Data(contentsOf: file), named: file.lastPathComponent, to: "pdf")
-                    let written = try SiblingWriter.write(pdf, nextTo: file, extension: "pdf")
+                    let format = Formats.outputs(for: file).first?.ext ?? "pdf"
+                    let pdf = try await client.convert(try Data(contentsOf: file), named: file.lastPathComponent, to: format)
+                    let written = try SiblingWriter.write(pdf, nextTo: file, extension: format)
                     lines.append("ok \(file.lastPathComponent) → \(written.lastPathComponent) \(pdf.count) bytes in \(String(format: "%.2f", Date().timeIntervalSince(started)))s")
                 } catch {
                     lines.append("fail \(file.lastPathComponent): \(error)")

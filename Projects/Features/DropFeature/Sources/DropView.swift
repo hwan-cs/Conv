@@ -130,6 +130,9 @@ private struct DragOverScreen: View {
 private struct PickScreen: View {
     let model: DropModel
 
+    private var primaries: [Formats.Output] { model.outputs.filter(\.isPrimary) }
+    private var others: [Formats.Output] { model.outputs.filter { !$0.isPrimary } }
+
     var body: some View {
         HStack(alignment: .center, spacing: 28) {
             FileCard(items: model.items)
@@ -143,7 +146,7 @@ private struct PickScreen: View {
                     .tracking(-0.5)
                     .foregroundStyle(ConvColor.ink)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 18) {
-                    ForEach(Array(model.outputs.enumerated()), id: \.element.id) { index, output in
+                    ForEach(Array(primaries.enumerated()), id: \.element.id) { index, output in
                         Keycap(
                             ext: output.ext,
                             caption: output.caption,
@@ -151,6 +154,20 @@ private struct PickScreen: View {
                             isRecommended: index == 0
                         ) {
                             model.choose(output)
+                        }
+                    }
+                }
+                if !others.isEmpty {
+                    HStack(spacing: 8) {
+                        Text("더 보기")
+                            .font(ConvFont.sans(12, .semibold))
+                            .foregroundStyle(ConvColor.ink)
+                        ForEach(others) { output in
+                            Button(StickerStyle.label(for: output.ext)) { model.choose(output) }
+                                .buttonStyle(.plain)
+                                .font(ConvFont.mono(12, .bold))
+                                .foregroundStyle(ConvColor.muted)
+                                .help(output.caption)
                         }
                     }
                 }
@@ -171,6 +188,11 @@ private struct PickScreen: View {
 private struct FileCard: View {
     let items: [DropModel.Item]
 
+    private var title: String {
+        guard let first = items.first else { return "" }
+        return items.count == 1 ? first.name : "\(first.name) 외 \(items.count - 1)개"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             ZStack(alignment: .topLeading) {
@@ -178,22 +200,30 @@ private struct FileCard: View {
                     .fill(ConvColor.paper2)
                     .frame(height: 150)
                     .overlay {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 44, weight: .light))
-                            .foregroundStyle(ConvColor.muted)
+                        if let thumbnail = items.first?.thumbnail {
+                            Image(decorative: thumbnail, scale: 2)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 44, weight: .light))
+                                .foregroundStyle(ConvColor.muted)
+                        }
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 if let first = items.first {
                     FormatSticker(first.ext, size: .mini)
                         .rotationEffect(.degrees(-6))
                         .offset(x: 8, y: 10)
                 }
             }
-            Text(items.count == 1 ? items[0].name : "\(items[0].name) 외 \(items.count - 1)개")
+            // The card can be drawn once more while the model empties on cancel.
+            Text(title)
                 .font(ConvFont.mono(12, .bold))
                 .foregroundStyle(ConvColor.ink)
                 .lineLimit(1)
                 .truncationMode(.middle)
-            if items.count == 1, let size = items[0].size {
+            if items.count == 1, let size = items.first?.size {
                 Text(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))
                     .font(ConvFont.mono(11))
                     .foregroundStyle(ConvColor.muted)
