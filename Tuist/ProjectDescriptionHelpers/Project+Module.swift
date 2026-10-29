@@ -4,10 +4,16 @@ public enum Conv {
     public static let bundleIDPrefix = "com.conv"
     public static let deploymentTargets: DeploymentTargets = .macOS("14.0")
 
+    /// Distributed directly (Developer ID, notarized), not through the App Store.
+    public static let developmentTeam = "6DXT245L5T"
+
     public static let baseSettings: SettingsDictionary = [
         "SWIFT_VERSION": "6.0",
         "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
         "DEAD_CODE_STRIPPING": "YES",
+        "DEVELOPMENT_TEAM": .string(developmentTeam),
+        // Notarization requires the hardened runtime.
+        "ENABLE_HARDENED_RUNTIME": "YES",
     ]
 }
 
