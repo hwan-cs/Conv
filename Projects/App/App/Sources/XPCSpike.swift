@@ -57,15 +57,29 @@ enum XPCSpike {
                 let started = Date()
                 do {
                     let format = Formats.outputs(for: file).first?.ext ?? "pdf"
-                    let pdf = try await client.convert(try Data(contentsOf: file), named: file.lastPathComponent, to: format)
-                    let written = try SiblingWriter.write(pdf, nextTo: file, extension: format)
-                    lines.append("ok \(file.lastPathComponent) → \(written.lastPathComponent) \(pdf.count) bytes in \(String(format: "%.2f", Date().timeIntervalSince(started)))s")
+                    let reports = ProgressLog()
+                    let converted = try await client.convert(file, to: format) { reports.add($0) }
+                    let written = try SiblingWriter.copy(converted, nextTo: file, extension: format)
+                    let size = (try? written.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+                    lines.append("ok \(file.lastPathComponent) → \(written.lastPathComponent) \(size) bytes in \(String(format: "%.2f", Date().timeIntervalSince(started)))s, \(reports.summary)")
                 } catch {
                     lines.append("fail \(file.lastPathComponent): \(error)")
                 }
             }
             try? Data(lines.joined(separator: "\n").utf8).write(to: log)
             NSApp.terminate(nil)
+        }
+    }
+
+    /// Progress reports as they arrive, for the log.
+    private final class ProgressLog: @unchecked Sendable {
+        private let lock = NSLock()
+        private var fractions: [Double] = []
+
+        func add(_ fraction: Double) { lock.withLock { fractions.append(fraction) } }
+
+        var summary: String {
+            lock.withLock { "\(fractions.count) progress reports, last \(fractions.last.map { String(format: "%.2f", $0) } ?? "none")" }
         }
     }
 

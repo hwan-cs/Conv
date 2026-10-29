@@ -18,6 +18,33 @@ public enum SiblingWriter {
     }
 
     public static func write(_ data: Data, nextTo original: URL, extension ext: String) throws -> URL {
+        try write(nextTo: original, extension: ext) { try data.write(to: $0, options: .withoutOverwriting) }
+    }
+
+    /// Streams the rest of `handle` beside the original: converted videos don't fit in memory.
+    public static func copy(_ handle: FileHandle, nextTo original: URL, extension ext: String) throws -> URL {
+        try write(nextTo: original, extension: ext) { try copy(handle, to: $0, overwriting: false) }
+    }
+
+    /// Streams into a place the user chose in a save panel; its URL is already granted.
+    public static func copy(_ handle: FileHandle, to url: URL) throws {
+        try copy(handle, to: url, overwriting: true)
+    }
+
+    private static func copy(_ handle: FileHandle, to url: URL, overwriting: Bool) throws {
+        if !overwriting, FileManager.default.fileExists(atPath: url.path) {
+            throw CocoaError(.fileWriteFileExists)
+        }
+        guard FileManager.default.createFile(atPath: url.path, contents: nil) else { throw CocoaError(.fileWriteNoPermission) }
+        let output = try FileHandle(forWritingTo: url)
+        defer { try? output.close() }
+        try handle.seek(toOffset: 0)
+        while let chunk = try handle.read(upToCount: 4 << 20), !chunk.isEmpty {
+            try output.write(contentsOf: chunk)
+        }
+    }
+
+    private static func write(nextTo original: URL, extension ext: String, _ body: (URL) throws -> Void) throws -> URL {
         let target = sibling(of: original, extension: ext)
         let presenter = RelatedItemPresenter(primary: original, item: target)
         NSFileCoordinator.addFilePresenter(presenter)
@@ -27,7 +54,7 @@ public enum SiblingWriter {
         var writeError: Error?
         NSFileCoordinator(filePresenter: presenter).coordinate(writingItemAt: target, options: [], error: &coordinationError) { url in
             do {
-                try data.write(to: url, options: .withoutOverwriting)
+                try body(url)
             } catch {
                 writeError = error
             }

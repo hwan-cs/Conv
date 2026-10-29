@@ -31,7 +31,18 @@ import Testing
         }
     }
 
+    @Test func videosBecomeMP4OrTheirSound() {
+        #expect(Formats.outputs(for: URL(filePath: "/tmp/clip.MOV")).map(\.ext) == ["mp4", "m4a", "mp3"])
+        #expect(Formats.outputs(for: URL(filePath: "/tmp/clip.mp4")).map(\.ext) == ["mov", "m4a", "mp3"])
+    }
+
+    @Test func soundsRecommendMP3UnlessAlreadyMP3() {
+        #expect(Formats.outputs(for: URL(filePath: "/tmp/memo.m4a")).first?.ext == "mp3")
+        #expect(Formats.outputs(for: URL(filePath: "/tmp/song.mp3")).map(\.ext) == ["m4a", "wav", "aiff"])
+        #expect(Formats.outputs(for: URL(filePath: "/tmp/take.aif")).map(\.ext) == ["mp3", "m4a", "wav"])
+    }
+
     @Test func unknownFilesHaveNoOutputs() {
-        #expect(Formats.outputs(for: URL(filePath: "/tmp/song.mp3")).isEmpty)
+        #expect(Formats.outputs(for: URL(filePath: "/tmp/archive.zip")).isEmpty)
     }
 }

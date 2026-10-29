@@ -21,12 +21,22 @@ public enum Formats {
 
     public static let documentInputs: Set<String> = ["docx", "hwp", "hwpx"]
     public static let imageInputs: Set<String> = ["heic", "heif", "jpg", "jpeg", "png", "webp", "tiff", "tif", "gif", "bmp", "avif"]
+    public static let videoInputs: Set<String> = ["mov", "mp4", "m4v"]
+    public static let audioInputs: Set<String> = ["m4a", "mp3", "wav", "aiff", "aif", "caf", "aac", "flac"]
+    public static var mediaInputs: Set<String> { videoInputs.union(audioInputs) }
 
     /// The best choice first: it is the recommended key.
     public static func outputs(for input: URL) -> [Output] {
         let ext = normalized(input.pathExtension)
         if documentInputs.contains(ext) {
             return [Output(ext: "pdf", caption: "인쇄·공유용, 그대로 보여요")]
+        }
+        if videoInputs.contains(ext) {
+            let order = ext == "mp4" ? ["mov", "m4a", "mp3"] : ["mp4", "mov", "m4a", "mp3"]
+            return outputs(order.filter { $0 != ext })
+        }
+        if audioInputs.contains(ext) {
+            return outputs(["mp3", "m4a", "wav", "aiff"].filter { $0 != ext })
         }
         guard imageInputs.contains(ext) else { return [] }
         let order: [String] = switch ext {
@@ -35,8 +45,11 @@ public enum Formats {
         case "gif": ["png", "jpg", "pdf", "heic", "tiff", "bmp", "avif"]
         default: ["jpg", "png", "pdf", "heic", "tiff", "gif", "bmp", "avif"]
         }
-        let available = order.filter { $0 != ext && canWrite($0) }
-        return available.enumerated().map { index, output in
+        return outputs(order.filter { $0 != ext && canWrite($0) })
+    }
+
+    private static func outputs(_ order: [String]) -> [Output] {
+        order.enumerated().map { index, output in
             Output(ext: output, caption: caption(output, recommended: index == 0), isPrimary: index < 4)
         }
     }
@@ -51,6 +64,12 @@ public enum Formats {
         case "gif": "움직이는 이미지 유지"
         case "bmp": "오래된 프로그램용"
         case "avif": "가장 작은 용량"
+        case "mp4": "어디서나 재생돼요"
+        case "mov": "Apple 기기·편집용"
+        case "m4a": "소리만, 작은 용량 (AAC)"
+        case "mp3": "소리만, 어디서나 재생돼요"
+        case "wav": "무손실, 편집용"
+        case "aiff": "무손실, Mac 편집용"
         default: ""
         }
         return recommended ? "추천 · \(base)" : base
@@ -61,6 +80,7 @@ public enum Formats {
         case "jpeg": "jpg"
         case "tif": "tiff"
         case "heif": "heic"
+        case "aif": "aiff"
         case let other: other
         }
     }

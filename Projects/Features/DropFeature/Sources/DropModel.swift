@@ -1,8 +1,8 @@
 import AppKit
-import ImageIO
 import ConversionKit
 import Observation
 import Platform
+import QuickLookThumbnailing
 import UniformTypeIdentifiers
 
 /// The main window's flow: files arrive, the user picks a format, each file is converted in the
@@ -20,7 +20,8 @@ public final class DropModel {
     public struct Item: Identifiable, Equatable {
         public enum Status: Equatable {
             case waiting
-            case converting
+            /// With how far along it is, once the service has said.
+            case converting(Double?)
             case done(URL)
             case failed(String)
         }
@@ -28,7 +29,7 @@ public final class DropModel {
         public let id = UUID()
         public let url: URL
         public let size: Int64?
-        /// A small preview for images.
+        /// Quick Look's preview, once it has made one.
         public var thumbnail: CGImage?
         public var status: Status = .waiting
 
@@ -65,7 +66,18 @@ public final class DropModel {
     }
 
     public var settledCount: Int {
-        items.filter { $0.status != .waiting && $0.status != .converting }.count
+        items.filter {
+            switch $0.status {
+            case .waiting, .converting: false
+            case .done, .failed: true
+            }
+        }.count
+    }
+
+    /// Finished files plus how far the current one is, over all of them.
+    public var overallProgress: Double {
+        let current = items.lazy.compactMap { if case .converting(let fraction) = $0.status { fraction ?? 0 } else { nil } }.first ?? 0
+        return (Double(settledCount) + current) / Double(max(items.count, 1))
     }
 
     public func accept(_ urls: [URL]) {
@@ -74,12 +86,13 @@ public final class DropModel {
         items = files.map { url in
             withAccess(url) {
                 let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init)
-                return Item(url: url, size: size, thumbnail: Self.thumbnail(of: url))
+                return Item(url: url, size: size)
             }
         }
+        for item in items { loadThumbnail(for: item) }
         if outputs.isEmpty {
             let kinds = Set(items.map { "." + $0.ext.uppercased() }).sorted().joined(separator: ", ")
-            notice = "\(kinds) 파일은 아직 바꿀 수 없어요. 지금은 문서(DOCX, HWP, HWPX)와 이미지(HEIC, JPG, PNG, WebP 등)를 바꿀 수 있어요."
+            notice = "\(kinds) 파일은 아직 바꿀 수 없어요. 지금은 문서(DOCX, HWP, HWPX), 이미지(HEIC, JPG, PNG 등), 영상(MOV, MP4), 소리(MP3, M4A, WAV 등)를 바꿀 수 있어요."
             items = []
             phase = .empty
             return
@@ -108,32 +121,34 @@ public final class DropModel {
 
     private func convertAll(to output: Formats.Output) async {
         for index in items.indices {
-            items[index].status = .converting
+            items[index].status = .converting(nil)
             items[index].status = await convert(items[index], to: output)
         }
         phase = .done
     }
 
     private func convert(_ item: Item, to output: Formats.Output) async -> Item.Status {
-        guard let data = withAccess(item.url, { try? Data(contentsOf: item.url) }) ?? nil else {
+        let scoped = item.url.startAccessingSecurityScopedResource()
+        defer { if scoped { item.url.stopAccessingSecurityScopedResource() } }
+        let converted: FileHandle
+        do {
+            let id = item.id
+            converted = try await client.convert(item.url, to: output.ext) { fraction in
+                Task { @MainActor [weak self] in self?.update(id, progress: fraction) }
+            }
+        } catch let error as ConversionClient.Failure {
+            return .failed(error.description)
+        } catch {
             return .failed("파일을 읽을 수 없어요")
         }
-        let converted: Data
+        defer { try? converted.close() }
         do {
-            converted = try await client.convert(data, named: item.name, to: output.ext)
-        } catch {
-            return .failed(String(describing: error))
-        }
-        do {
-            let written = try withAccess(item.url) {
-                try SiblingWriter.write(converted, nextTo: item.url, extension: output.ext)
-            }
-            return .done(written)
+            return .done(try SiblingWriter.copy(converted, nextTo: item.url, extension: output.ext))
         } catch {
             // A same-named file is already there, or the folder is off limits: ask where to put it.
             guard let chosen = askWhereToSave(item, output: output) else { return .failed("저장하지 않았어요") }
             do {
-                try SiblingWriter.write(converted, to: chosen)
+                try SiblingWriter.copy(converted, to: chosen)
                 return .done(chosen)
             } catch {
                 return .failed("저장하지 못했어요")
@@ -150,15 +165,31 @@ public final class DropModel {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    private static func thumbnail(of url: URL) -> CGImage? {
-        guard Formats.imageInputs.contains(url.pathExtension.lowercased()),
-              let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 400,
-        ]
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+    private func update(_ id: Item.ID, progress fraction: Double) {
+        guard let index = items.firstIndex(where: { $0.id == id }), case .converting = items[index].status else { return }
+        items[index].status = .converting(fraction)
+    }
+
+    /// Asks Quick Look for a preview: a video's first frame, a document's first page, a photo.
+    /// Files it doesn't know, such as .hwp, keep their icon.
+    private func loadThumbnail(for item: Item) {
+        let (id, url) = (item.id, item.url)
+        let scoped = url.startAccessingSecurityScopedResource()
+        let request = QLThumbnailGenerator.Request(
+            fileAt: url,
+            size: CGSize(width: 200, height: 150),
+            scale: 2,
+            representationTypes: .thumbnail
+        )
+        QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { thumbnail, _ in
+            if scoped { url.stopAccessingSecurityScopedResource() }
+            guard let image = thumbnail?.cgImage else { return }
+            let preview = UncheckedImage(image)
+            Task { @MainActor [weak self] in
+                guard let self, let index = items.firstIndex(where: { $0.id == id }) else { return }
+                items[index].thumbnail = preview.image
+            }
+        }
     }
 
     /// Files from the open panel are security-scoped; dropped files are granted as they arrive.
@@ -167,4 +198,10 @@ public final class DropModel {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         return try body()
     }
+}
+
+/// CGImage is immutable; this carries one across the Quick Look callback.
+private struct UncheckedImage: @unchecked Sendable {
+    let image: CGImage
+    init(_ image: CGImage) { self.image = image }
 }

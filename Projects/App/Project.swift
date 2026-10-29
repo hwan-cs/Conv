@@ -19,15 +19,22 @@ let documentTypes: Plist.Value = [
         "CFBundleTypeName": "Convertible File",
         "CFBundleTypeRole": "Viewer",
         "LSHandlerRank": "None",
-        "LSItemContentTypes": ["org.openxmlformats.wordprocessingml.document", "public.image"],
-        "CFBundleTypeExtensions": ["docx", "hwp", "hwpx", "heic", "heif", "jpg", "jpeg", "png", "webp", "tiff", "tif", "gif", "bmp", "avif"],
+        "LSItemContentTypes": ["org.openxmlformats.wordprocessingml.document", "public.image", "public.movie", "public.audio"],
+        "CFBundleTypeExtensions": [
+            "docx", "hwp", "hwpx", "heic", "heif", "jpg", "jpeg", "png", "webp", "tiff", "tif", "gif", "bmp", "avif",
+            "mov", "mp4", "m4v", "m4a", "mp3", "wav", "aiff", "aif", "caf", "aac", "flac",
+        ],
     ],
     [
         "CFBundleTypeName": "Converted File",
         "CFBundleTypeRole": "Editor",
         "LSHandlerRank": "None",
-        "LSItemContentTypes": ["com.adobe.pdf", "public.jpeg", "public.png", "public.heic", "public.tiff", "com.compuserve.gif", "com.microsoft.bmp", "public.avif"],
-        "CFBundleTypeExtensions": ["pdf", "jpg", "png", "heic", "tiff", "gif", "bmp", "avif"],
+        "LSItemContentTypes": [
+            "com.adobe.pdf", "public.jpeg", "public.png", "public.heic", "public.tiff", "com.compuserve.gif",
+            "com.microsoft.bmp", "public.avif", "public.mpeg-4", "com.apple.quicktime-movie",
+            "com.apple.m4a-audio", "public.mp3", "com.microsoft.waveform-audio", "public.aiff-audio",
+        ],
+        "CFBundleTypeExtensions": ["pdf", "jpg", "png", "heic", "tiff", "gif", "bmp", "avif", "mp4", "mov", "m4a", "mp3", "wav", "aiff"],
         "NSIsRelatedItemType": true,
     ],
 ]
@@ -86,7 +93,8 @@ let conversionXPC = Target.target(
         .module(.hwpEngine),
         .module(.mediaEngine),
     ],
-    settings: .settings(base: Conv.baseSettings)
+    // LAME is embedded as a dynamic library in the service's Frameworks folder.
+    settings: .settings(base: Conv.baseSettings.merging(["LD_RUNPATH_SEARCH_PATHS": ["$(inherited)", "@executable_path/../Frameworks"]]) { $1 })
 )
 
 let finderSync = Target.target(

@@ -7,10 +7,13 @@ public final class ConversionClient: @unchecked Sendable {
     }
 
     private let connection: NSXPCConnection
+    private let progress = ProgressRouter()
 
     public init() {
         connection = NSXPCConnection(serviceName: ConversionService.serviceName)
         connection.remoteObjectInterface = NSXPCInterface(with: ConversionServiceProtocol.self)
+        connection.exportedInterface = NSXPCInterface(with: ConversionProgressProtocol.self)
+        connection.exportedObject = progress
         connection.resume()
     }
 
@@ -18,9 +21,20 @@ public final class ConversionClient: @unchecked Sendable {
         connection.invalidate()
     }
 
-    /// Converts a file's bytes into `format` in the sandboxed service.
-    public func convert(_ data: Data, named name: String, to format: String) async throws -> Data {
-        try await withCheckedThrowingContinuation { continuation in
+    /// Converts the file at `input` into `format` in the sandboxed service, and returns the result
+    /// open for reading. The caller must be able to read `input` (security scope already started).
+    /// - Parameter onProgress: Called with 0…1 as the service reports it, on an XPC queue.
+    public func convert(
+        _ input: URL,
+        to format: String,
+        onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> FileHandle {
+        let handle = try FileHandle(forReadingFrom: input)
+        defer { try? handle.close() }
+        let job = UUID().uuidString
+        progress.register(job, onProgress)
+        defer { progress.unregister(job) }
+        return try await withCheckedThrowingContinuation { continuation in
             let resumed = Once()
             let service = connection.remoteObjectProxyWithErrorHandler { error in
                 // The service crashed or quit (it exits after a timed-out render); launchd relaunches it.
@@ -30,7 +44,7 @@ public final class ConversionClient: @unchecked Sendable {
                 if resumed.claim() { continuation.resume(throwing: Failure(description: "변환 서비스에 연결할 수 없어요")) }
                 return
             }
-            service.convert(data, named: name, to: format) { output, error in
+            service.convert(handle, named: input.lastPathComponent, to: format, job: job) { output, error in
                 guard resumed.claim() else { return }
                 if let output {
                     continuation.resume(returning: output)
@@ -39,6 +53,25 @@ public final class ConversionClient: @unchecked Sendable {
                 }
             }
         }
+    }
+}
+
+/// Receives the service's progress reports and hands each to its job's handler.
+private final class ProgressRouter: NSObject, ConversionProgressProtocol, @unchecked Sendable {
+    private let lock = NSLock()
+    private var handlers: [String: @Sendable (Double) -> Void] = [:]
+
+    func register(_ job: String, _ handler: @escaping @Sendable (Double) -> Void) {
+        lock.withLock { handlers[job] = handler }
+    }
+
+    func unregister(_ job: String) {
+        lock.withLock { _ = handlers.removeValue(forKey: job) }
+    }
+
+    func report(job: String, fraction: Double) {
+        let handler = lock.withLock { handlers[job] }
+        handler?(min(max(fraction, 0), 1))
     }
 }
 

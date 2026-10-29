@@ -335,7 +335,7 @@ private struct ConvertingScreen: View {
                     .font(ConvFont.mono(13, .bold))
             }
             .foregroundStyle(ConvColor.ink)
-            ProgressBar(value: Double(model.settledCount) / Double(max(model.items.count, 1)))
+            ProgressBar(value: model.overallProgress)
             ScrollView {
                 VStack(spacing: 10) {
                     ForEach(model.items) { item in
@@ -358,7 +358,7 @@ private struct ProgressBar: View {
             }
             .overlay(Capsule().strokeBorder(ConvColor.ink, lineWidth: 1.5))
         }
-        .frame(height: 12)
+        .frame(height: 10)
         .animation(.easeOut(duration: 0.2), value: value)
     }
 }
@@ -395,7 +395,15 @@ private struct ConversionRow: View {
         switch item.status {
         case .waiting:
             Text("대기 중").font(ConvFont.sans(12)).foregroundStyle(ConvColor.muted)
-        case .converting:
+        case .converting(let fraction?):
+            HStack(spacing: 8) {
+                ProgressBar(value: fraction)
+                    .frame(width: 70)
+                Text("\(Int(fraction * 100))%")
+                    .font(ConvFont.mono(11, .bold))
+                    .frame(width: 34, alignment: .trailing)
+            }
+        case .converting(nil):
             ProgressView().controlSize(.small)
         case .done:
             Image(systemName: "checkmark.circle").foregroundStyle(ConvColor.success)
