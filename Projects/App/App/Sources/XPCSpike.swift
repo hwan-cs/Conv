@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import ConversionKit
+import Platform
 
 /// P1 spike: `Conv.app/Contents/MacOS/Conv --spike-xpc-pdf` renders HTML to PDF through the
 /// sandboxed XPC service, writes `conv-spike/xpc.pdf` and `xpc.log` into the app's temporary
@@ -37,6 +38,33 @@ enum XPCSpike {
             } catch {
                 finish("write error: \(error)")
             }
+        }
+    }
+
+    /// `Conv --spike-convert`: converts every file in the app's `conv-spike/in` directory to PDF
+    /// through the service and writes each beside its original, logging to `convert.log`.
+    static var isConvertRequested: Bool { CommandLine.arguments.contains("--spike-convert") }
+
+    @MainActor
+    static func runConvert() {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "conv-spike/in", directoryHint: .isDirectory)
+        let log = directory.deletingLastPathComponent().appending(path: "convert.log")
+        Task { @MainActor in
+            let client = ConversionClient()
+            var lines: [String] = []
+            let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+            for file in files where file.pathExtension != "pdf" {
+                let started = Date()
+                do {
+                    let pdf = try await client.convert(try Data(contentsOf: file), named: file.lastPathComponent, to: "pdf")
+                    let written = try SiblingWriter.write(pdf, nextTo: file, extension: "pdf")
+                    lines.append("ok \(file.lastPathComponent) → \(written.lastPathComponent) \(pdf.count) bytes in \(String(format: "%.2f", Date().timeIntervalSince(started)))s")
+                } catch {
+                    lines.append("fail \(file.lastPathComponent): \(error)")
+                }
+            }
+            try? Data(lines.joined(separator: "\n").utf8).write(to: log)
+            NSApp.terminate(nil)
         }
     }
 

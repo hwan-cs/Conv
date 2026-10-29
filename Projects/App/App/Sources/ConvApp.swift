@@ -12,6 +12,9 @@ struct ConvApp: App {
         if XPCSpike.isRequested {
             DispatchQueue.main.async { XPCSpike.run() }
         }
+        if XPCSpike.isConvertRequested {
+            DispatchQueue.main.async { XPCSpike.runConvert() }
+        }
         #endif
     }
 

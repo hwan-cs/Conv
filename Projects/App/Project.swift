@@ -12,6 +12,26 @@ let sandbox: Entitlements = .dictionary([
     "com.apple.security.files.user-selected.read-write": true,
 ])
 
+/// Files Conv opens, without claiming to be their default app, and the outputs it writes beside
+/// them. `NSIsRelatedItemType` is what lets the sandboxed app create "보고서.pdf" next to "보고서.docx".
+let documentTypes: Plist.Value = [
+    [
+        "CFBundleTypeName": "Convertible Document",
+        "CFBundleTypeRole": "Viewer",
+        "LSHandlerRank": "None",
+        "LSItemContentTypes": ["org.openxmlformats.wordprocessingml.document"],
+        "CFBundleTypeExtensions": ["docx", "hwp", "hwpx"],
+    ],
+    [
+        "CFBundleTypeName": "PDF Output",
+        "CFBundleTypeRole": "Editor",
+        "LSHandlerRank": "None",
+        "LSItemContentTypes": ["com.adobe.pdf"],
+        "CFBundleTypeExtensions": ["pdf"],
+        "NSIsRelatedItemType": true,
+    ],
+]
+
 let app = Target.target(
     name: "Conv",
     destinations: .macOS,
@@ -21,6 +41,7 @@ let app = Target.target(
     infoPlist: .extendingDefault(with: version.merging([
         "CFBundleDisplayName": "Conv",
         "LSApplicationCategoryType": "public.app-category.utilities",
+        "CFBundleDocumentTypes": documentTypes,
     ]) { $1 }),
     sources: ["App/Sources/**"],
     entitlements: sandbox,
@@ -29,6 +50,7 @@ let app = Target.target(
         .module(.menuBarFeature),
         .module(.settingsFeature),
         .module(.conversionKit),
+        .module(.platform),
         .target(name: "ConversionXPC"),
         .target(name: "ConvFinderSync"),
     ],
