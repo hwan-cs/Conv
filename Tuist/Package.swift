@@ -11,5 +11,6 @@ let package = Package(
     name: "Conv",
     dependencies: [
         .package(url: "https://github.com/pointfreeco/swift-snapshot-testing", from: "1.17.0"),
+        .package(url: "https://github.com/weichsel/ZIPFoundation", from: "0.9.19"),
     ]
 )

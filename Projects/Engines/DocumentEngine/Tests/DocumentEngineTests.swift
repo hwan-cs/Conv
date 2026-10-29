@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import PDFKit
 import Testing
 @testable import DocumentEngine
@@ -49,6 +50,28 @@ import Testing
         #expect(pageText.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("BREAK-MARKER"))
     }
 
+    /// CSS units must come out at their physical size, so 72pt of CSS type is 72pt in the PDF.
+    @Test(arguments: [
+        PagedPDFRenderer.PageSetup.a4,
+        PagedPDFRenderer.PageSetup(
+            paperSize: CGSize(width: 612, height: 792),
+            margins: .init(top: 72, left: 90, bottom: 72, right: 30)
+        ),
+    ])
+    func cssUnitsKeepTheirPhysicalSize(page: PagedPDFRenderer.PageSetup) async throws {
+        let output = try Self.outputURL("units-\(Int(page.paperSize.width)).pdf")
+        let html = #"<p style="margin:0;font:72pt/1 Helvetica">MEASURE</p>"#
+        try await PagedPDFRenderer().render(html: html, baseURL: nil, to: output, page: page)
+
+        let document = try #require(PDFDocument(url: output))
+        let pdfPage = try #require(document.page(at: 0))
+        let selection = try #require(document.findString("MEASURE", withOptions: []).first)
+        let font = try #require(selection.attributedString?.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        #expect(abs(font.pointSize - 72) < 0.5, "72pt CSS printed at \(font.pointSize)pt")
+        // Text starts at the left margin.
+        #expect(abs(selection.bounds(for: pdfPage).minX - page.margins.left) < 8)
+    }
+
     @Test func printThatOutlivesTheTimeoutThrowsAndLeavesNoFile() async throws {
         let output = try Self.outputURL("timeout.pdf")
         await #expect(throws: PagedPDFRenderer.RenderError.timedOut) {
@@ -63,5 +86,172 @@ import Testing
         let url = directory.appending(path: name)
         try? FileManager.default.removeItem(at: url)
         return url
+    }
+}
+
+@MainActor
+@Suite(.timeLimit(.minutes(1))) struct DocxPDFConverterTests {
+    @Test(arguments: [
+        ("formatting", ["주간 회의록", "굵게", "20pt 글자", "가운데 정렬된 문단", "※ → ①", "int buffer[100];"]),
+        ("table", ["TABLE-BEFORE", "항목", "엔진 스파이크", "병합된 셀", "TABLE-AFTER"]),
+        ("lists", ["첫째 항목", "들여쓴 하위 항목", "정리"]),
+        ("image", ["IMAGE-BEFORE", "IMAGE-AFTER"]),
+        ("pagebreak", ["PAGE-ONE", "PAGE-TWO"]),
+        ("long", ["문단 1.", "문단 200."]),
+    ])
+    func convertsWithoutLosingText(fixture: String, expected: [String]) async throws {
+        let input = Self.fixture(fixture)
+        let directory = try Self.outputDirectory()
+        // Kept for eyeballing which step loses formatting.
+        try DocxPDFConverter().html(for: input).write(to: directory.appending(path: "\(fixture).html"), atomically: true, encoding: .utf8)
+        let output = directory.appending(path: "\(fixture).pdf")
+        try await DocxPDFConverter().convert(input, to: output)
+
+        let document = try #require(PDFDocument(url: output))
+        let text = document.string ?? ""
+        for snippet in expected {
+            #expect(text.contains(snippet), "\(fixture).pdf is missing \"\(snippet)\"")
+        }
+    }
+
+    @Test func longDocumentSpansSeveralPages() async throws {
+        let output = try Self.outputDirectory().appending(path: "long-pages.pdf")
+        try await DocxPDFConverter().convert(Self.fixture("long"), to: output)
+        #expect(try #require(PDFDocument(url: output)).pageCount >= 5)
+    }
+
+    @Test func wordPageBreakStartsANewPage() async throws {
+        let output = try Self.outputDirectory().appending(path: "pagebreak-check.pdf")
+        try await DocxPDFConverter().convert(Self.fixture("pagebreak"), to: output)
+        let document = try #require(PDFDocument(url: output))
+        let page = (0..<document.pageCount).first { document.page(at: $0)?.string?.contains("PAGE-TWO") == true }
+        #expect(page == 1)
+    }
+
+    @Test func headingStyleAndRunFormattingSurvive() throws {
+        let html = try DocxPDFConverter().html(for: Self.fixture("formatting"))
+        // Heading 1 in the fixture's styles.xml: bold, sz 36 half-points.
+        #expect(html.contains("font-weight:bold;font-size:18pt"))
+        #expect(html.contains("color:#FF5A1F"))
+        #expect(html.contains("font-size:20pt"))
+        #expect(html.contains("text-align:center"))
+        #expect(html.contains("'Apple SD Gothic Neo'"))
+    }
+
+    @Test func numberedAndBulletedListsGetWordLabels() async throws {
+        let output = try Self.outputDirectory().appending(path: "lists-labels.pdf")
+        try await DocxPDFConverter().convert(Self.fixture("lists"), to: output)
+        let text = try #require(PDFDocument(url: output)?.string)
+        for label in ["•", "◦", "1.", "2.", "3."] {
+            #expect(text.contains(label), "missing list label \(label)")
+        }
+    }
+
+    @Test func tableKeepsMergesAndShading() throws {
+        let html = try DocxPDFConverter().html(for: Self.fixture("table"))
+        #expect(html.contains(#"colspan="3""#))
+        #expect(html.contains("background:#D9D9D9"))
+        #expect(html.contains("0.5pt solid #000000"))
+        #expect(html.contains("<col style=\"width:150pt\">"))
+    }
+
+    @Test func imageIsEmbeddedAtItsSize() throws {
+        let html = try DocxPDFConverter().html(for: Self.fixture("image"))
+        #expect(html.contains("data:image/png;base64,"))
+        #expect(html.contains("width:216pt"))
+    }
+
+    @Test func pageSizeAndMarginsComeFromTheSection() throws {
+        let page = try DocxPDFConverter().pageSetup(for: Self.fixture("formatting"))
+        #expect(abs(page.paperSize.width - 595.3) < 0.1)
+        #expect(abs(page.paperSize.height - 841.9) < 0.1)
+        #expect(abs(page.margins.left - 56.7) < 0.1)
+    }
+
+    @Test func headersAndLivePageNumbersAreStampedOnEveryPage() async throws {
+        let output = try Self.outputDirectory().appending(path: "header-footer.pdf")
+        try await DocxPDFConverter().convert(Self.fixture("header-footer"), to: output)
+        let document = try #require(PDFDocument(url: output))
+        try #require(document.pageCount == 2)
+        for (index, body) in ["BODY-ONE", "BODY-TWO"].enumerated() {
+            let text = document.page(at: index)?.string ?? ""
+            #expect(text.contains(body))
+            #expect(text.contains("HEADER-TEXT"), "page \(index + 1) has no header")
+            #expect(text.contains("Page \(index + 1)"), "page \(index + 1) has no live page number")
+            #expect(!text.contains("99"), "the stale cached page number leaked through")
+            #expect(!text.contains("right"), "the absolute tab's alignment leaked into the text")
+        }
+        // The absolute tab pins the header to the right margin.
+        let header = try #require(document.findString("HEADER-TEXT", withOptions: []).first)
+        let pageOne = try #require(document.page(at: 0))
+        #expect(abs(header.bounds(for: pageOne).maxX - (595.28 - 56.7)) < 3)
+        // Text extraction can't see an opaque overlay covering the body; pixels can.
+        let page = try #require(document.page(at: 1))
+        let body = try #require(document.findString("BODY-TWO", withOptions: []).first { $0.pages.first == page })
+        #expect(Self.inkCoverage(of: body.bounds(for: page), on: page) > 0.05, "BODY-TWO is covered by the overlay")
+    }
+
+    /// Fraction of dark pixels in `rect` when the page is drawn.
+    private static func inkCoverage(of rect: CGRect, on page: PDFPage) -> Double {
+        let image = page.thumbnail(of: page.bounds(for: .mediaBox).size, for: .mediaBox)
+        guard let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff) else { return 0 }
+        let scale = Double(bitmap.pixelsWide) / page.bounds(for: .mediaBox).width
+        var dark = 0
+        var total = 0
+        for x in Int(rect.minX * scale)..<Int(rect.maxX * scale) {
+            for y in Int(rect.minY * scale)..<Int(rect.maxY * scale) {
+                // Bitmap rows run top-down; PDF y runs bottom-up.
+                guard let color = bitmap.colorAt(x: x, y: bitmap.pixelsHigh - 1 - y) else { continue }
+                total += 1
+                if color.brightnessComponent < 0.5 { dark += 1 }
+            }
+        }
+        return total == 0 ? 0 : Double(dark) / Double(total)
+    }
+
+    @Test func embeddedFontKeyUndoesItsOwnObfuscation() {
+        let font = Data((0..<64).map { UInt8($0) })
+        let key = "{23EAE097-B649-4736-A073-9DB14CE96906}"
+        let obfuscated = DocxEmbeddedFonts.deobfuscate(font, key: key)
+        #expect(obfuscated != font)
+        #expect(obfuscated[32...] == font[32...])
+        #expect(DocxEmbeddedFonts.deobfuscate(obfuscated, key: key) == font)
+    }
+
+    private static func fixture(_ name: String) -> URL {
+        URL(filePath: #filePath).deletingLastPathComponent().appending(path: "Fixtures/\(name).docx")
+    }
+
+    private static func outputDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "conv-spike/docx", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+}
+
+/// Converts every .docx in `$CONV_SAMPLES` into `$CONV_SAMPLES_OUT` for side-by-side review.
+/// Run with `TEST_RUNNER_CONV_SAMPLES=… TEST_RUNNER_CONV_SAMPLES_OUT=… xcodebuild test`.
+@MainActor
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["CONV_SAMPLES"] != nil))
+struct DocxSampleTests {
+    @Test func convertSamples() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        let input = URL(filePath: try #require(environment["CONV_SAMPLES"]), directoryHint: .isDirectory)
+        let output = URL(filePath: try #require(environment["CONV_SAMPLES_OUT"]), directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        let samples = try FileManager.default.contentsOfDirectory(at: input, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "docx" }
+        for sample in samples {
+            let name = sample.deletingPathExtension().lastPathComponent
+            let started = ContinuousClock.now
+            do {
+                try DocxPDFConverter().html(for: sample)
+                    .write(to: output.appending(path: "\(name).html"), atomically: true, encoding: .utf8)
+                try await DocxPDFConverter().convert(sample, to: output.appending(path: "\(name).pdf"))
+                print("SAMPLE \(name): ok in \(ContinuousClock.now - started)")
+            } catch {
+                Issue.record("\(name): \(error)")
+            }
+        }
     }
 }

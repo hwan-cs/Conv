@@ -7,17 +7,34 @@ import WebKit
 /// which also honors CSS `break-before: page`.
 @MainActor
 public final class PagedPDFRenderer {
-    public struct PageSetup: Sendable {
-        public var paperSize: CGSize
-        public var margin: CGFloat
+    public struct PageSetup: Sendable, Equatable {
+        public struct Margins: Sendable, Equatable {
+            public var top: CGFloat
+            public var left: CGFloat
+            public var bottom: CGFloat
+            public var right: CGFloat
 
-        public init(paperSize: CGSize, margin: CGFloat) {
+            public init(top: CGFloat, left: CGFloat, bottom: CGFloat, right: CGFloat) {
+                self.top = top
+                self.left = left
+                self.bottom = bottom
+                self.right = right
+            }
+        }
+
+        public var paperSize: CGSize
+        public var margins: Margins
+
+        public init(paperSize: CGSize, margins: Margins) {
             self.paperSize = paperSize
-            self.margin = margin
+            self.margins = margins
         }
 
         /// A4 with 2cm margins, in points.
-        public static let a4 = PageSetup(paperSize: CGSize(width: 595.28, height: 841.89), margin: 56.69)
+        public static let a4 = PageSetup(
+            paperSize: CGSize(width: 595.28, height: 841.89),
+            margins: Margins(top: 56.69, left: 56.69, bottom: 56.69, right: 56.69)
+        )
     }
 
     public enum RenderError: Error {
@@ -31,6 +48,8 @@ public final class PagedPDFRenderer {
 
     public init() {}
 
+    static let physicalZoom = 15.0 / 16.0
+
     public func render(
         html: String,
         baseURL: URL?,
@@ -41,7 +60,7 @@ public final class PagedPDFRenderer {
         // Unhosted processes (tests, the XPC service) have no NSApplication until asked for one.
         _ = NSApplication.shared
 
-        let contentWidth = page.paperSize.width - page.margin * 2
+        let contentWidth = page.paperSize.width - page.margins.left - page.margins.right
         let frame = CGRect(x: 0, y: 0, width: contentWidth, height: page.paperSize.height)
         let webView = WKWebView(frame: frame)
         // The print system needs the web view in a window; this one is never shown.
@@ -50,14 +69,18 @@ public final class PagedPDFRenderer {
 
         let deadline = ContinuousClock.now + timeout
         try await NavigationWaiter(webView: webView).load(html: html, baseURL: baseURL, timeout: timeout)
+        // WebKit prints CSS at 16/15 of its size (96/72 px-to-pt times its 1.25 minimum shrink),
+        // so a 10pt font would print at 10.67pt. Zooming by the inverse keeps CSS units physical.
+        _ = try? await webView.evaluateJavaScript("document.documentElement.style.zoom = '\(Self.physicalZoom)'")
 
         let info = NSPrintInfo()
         info.paperSize = page.paperSize
-        info.topMargin = page.margin
-        info.bottomMargin = page.margin
-        info.leftMargin = page.margin
-        info.rightMargin = page.margin
-        info.horizontalPagination = .fit
+        info.topMargin = page.margins.top
+        info.bottomMargin = page.margins.bottom
+        info.leftMargin = page.margins.left
+        info.rightMargin = page.margins.right
+        // Clip rather than fit: one over-wide image must not shrink every page.
+        info.horizontalPagination = .clip
         info.verticalPagination = .automatic
         info.isHorizontallyCentered = false
         info.isVerticallyCentered = false
