@@ -20,6 +20,7 @@ public enum Formats {
     }
 
     public static let documentInputs: Set<String> = ["docx", "hwp", "hwpx"]
+    public static let markdownInputs: Set<String> = ["md", "markdown"]
     public static let imageInputs: Set<String> = ["heic", "heif", "jpg", "jpeg", "png", "webp", "tiff", "tif", "gif", "bmp", "avif"]
     public static let videoInputs: Set<String> = ["mov", "mp4", "m4v"]
     public static let audioInputs: Set<String> = ["m4a", "mp3", "wav", "aiff", "aif", "caf", "aac", "flac"]
@@ -30,6 +31,12 @@ public enum Formats {
         let ext = normalized(input.pathExtension)
         if documentInputs.contains(ext) {
             return [Output(ext: "pdf", caption: "인쇄·공유용, 그대로 보여요")]
+        }
+        if markdownInputs.contains(ext) {
+            return [
+                Output(ext: "pdf", caption: "추천 · 인쇄·공유용, 쪽으로 나눠서"),
+                Output(ext: "html", caption: "웹 브라우저로 바로 열기"),
+            ]
         }
         if videoInputs.contains(ext) {
             let order = ext == "mp4" ? ["mov", "m4a", "mp3"] : ["mp4", "mov", "m4a", "mp3"]

@@ -19,9 +19,12 @@ let documentTypes: Plist.Value = [
         "CFBundleTypeName": "Convertible File",
         "CFBundleTypeRole": "Viewer",
         "LSHandlerRank": "None",
-        "LSItemContentTypes": ["org.openxmlformats.wordprocessingml.document", "public.image", "public.movie", "public.audio"],
+        "LSItemContentTypes": [
+            "org.openxmlformats.wordprocessingml.document", "net.daringfireball.markdown",
+            "public.image", "public.movie", "public.audio",
+        ],
         "CFBundleTypeExtensions": [
-            "docx", "hwp", "hwpx", "heic", "heif", "jpg", "jpeg", "png", "webp", "tiff", "tif", "gif", "bmp", "avif",
+            "docx", "hwp", "hwpx", "md", "markdown", "heic", "heif", "jpg", "jpeg", "png", "webp", "tiff", "tif", "gif", "bmp", "avif",
             "mov", "mp4", "m4v", "m4a", "mp3", "wav", "aiff", "aif", "caf", "aac", "flac",
         ],
     ],
@@ -32,9 +35,9 @@ let documentTypes: Plist.Value = [
         "LSItemContentTypes": [
             "com.adobe.pdf", "public.jpeg", "public.png", "public.heic", "public.tiff", "com.compuserve.gif",
             "com.microsoft.bmp", "public.avif", "public.mpeg-4", "com.apple.quicktime-movie",
-            "com.apple.m4a-audio", "public.mp3", "com.microsoft.waveform-audio", "public.aiff-audio",
+            "com.apple.m4a-audio", "public.mp3", "com.microsoft.waveform-audio", "public.aiff-audio", "public.html",
         ],
-        "CFBundleTypeExtensions": ["pdf", "jpg", "png", "heic", "tiff", "gif", "bmp", "avif", "mp4", "mov", "m4a", "mp3", "wav", "aiff"],
+        "CFBundleTypeExtensions": ["pdf", "jpg", "png", "heic", "tiff", "gif", "bmp", "avif", "mp4", "mov", "m4a", "mp3", "wav", "aiff", "html"],
         "NSIsRelatedItemType": true,
     ],
 ]

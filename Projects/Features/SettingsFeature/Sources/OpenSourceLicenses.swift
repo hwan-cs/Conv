@@ -51,6 +51,20 @@ struct OpenSourceLicense: Identifiable, Sendable {
             file: "ZIPFoundation"
         ),
         OpenSourceLicense(
+            name: "swift-markdown",
+            usage: "Markdown 파일 읽기",
+            license: "Apache 2.0",
+            source: URL(string: "https://github.com/swiftlang/swift-markdown")!,
+            file: "swift-markdown"
+        ),
+        OpenSourceLicense(
+            name: "cmark-gfm",
+            usage: "Markdown 문법 해석 (swift-markdown 안에서)",
+            license: "BSD 2-Clause 외",
+            source: URL(string: "https://github.com/swiftlang/swift-cmark")!,
+            file: "swift-cmark"
+        ),
+        OpenSourceLicense(
             name: "Pretendard",
             usage: "화면 글꼴",
             license: "SIL Open Font License 1.1",

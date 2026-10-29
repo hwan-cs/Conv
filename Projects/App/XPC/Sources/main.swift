@@ -70,6 +70,8 @@ extension ConversionServiceImpl {
                     try ImageConverter().convert(source, to: output)
                 case _ where Formats.mediaInputs.contains(ext):
                     try await MediaConverter().convert(source, to: output, progress: progress)
+                case _ where Formats.markdownInputs.contains(ext):
+                    try await MarkdownConverter().convert(source, to: output)
                 case ("docx", "pdf"):
                     try await DocxPDFConverter().convert(source, to: output)
                 case ("hwp", "pdf"), ("hwpx", "pdf"):

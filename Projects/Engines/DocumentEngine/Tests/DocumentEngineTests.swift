@@ -319,3 +319,72 @@ extension HwpEquationTests {
         #expect(math == "<math><mrow><mi>A</mi><mo>∪</mo><mi>B</mi></mrow></math>")
     }
 }
+
+@MainActor
+@Suite(.timeLimit(.minutes(1))) struct MarkdownConverterTests {
+    static let sample = """
+    ---
+    title: 메모
+    draft: true
+    ---
+    # 회의록 <초안>
+
+    **굵게**, *기울임*, ~~취소~~, `<div>` 코드와 [링크](https://example.com "설명").
+
+    - [x] 완료한 일
+    - [ ] 남은 일
+
+    | 이름 | 점수 |
+    |:---|---:|
+    | 가 | 10 |
+
+    ```swift
+    let tag = "<b>" && true
+    ```
+
+    > 인용
+    """
+
+    @Test func htmlEscapesTextAndKeepsStructure() {
+        let html = MarkdownConverter.page(for: Self.sample, title: "file")
+        #expect(html.contains("<title>회의록 &lt;초안&gt;</title>"))
+        #expect(html.contains("<h1 id=\"회의록-초안\">회의록 &lt;초안&gt;</h1>"))
+        #expect(html.contains("<code>&lt;div&gt;</code>"))
+        #expect(html.contains("<pre><code class=\"language-swift\">let tag = \"&lt;b&gt;\" &amp;&amp; true\n</code></pre>"))
+        #expect(html.contains("<del>취소</del>"))
+        #expect(html.contains("<a href=\"https://example.com\" title=\"설명\">링크</a>"))
+        #expect(html.contains("<li class=\"task\"><input type=\"checkbox\" disabled checked>완료한 일</li>"))
+        #expect(html.contains("<td style=\"text-align:right\">10</td>"))
+        #expect(html.contains("<blockquote>"))
+        // Front matter is metadata, not text.
+        #expect(!html.contains("draft"))
+    }
+
+    @Test func pdfIsPaginatedA4WithTheText() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "md-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let input = directory.appending(path: "notes.md")
+        let long = Self.sample + "\n\n" + (1...120).map { "문단 \($0)입니다." }.joined(separator: "\n\n")
+        try long.write(to: input, atomically: true, encoding: .utf8)
+        let output = directory.appending(path: "notes.pdf")
+        try await MarkdownConverter().convert(input, to: output)
+        let pdf = try #require(PDFDocument(url: output))
+        #expect(pdf.pageCount > 1)
+        let box = try #require(pdf.page(at: 0)?.bounds(for: .mediaBox))
+        #expect(abs(box.width - 595.28) < 1 && abs(box.height - 841.89) < 1)
+        let text = (0..<pdf.pageCount).compactMap { pdf.page(at: $0)?.string }.joined()
+        #expect(text.contains("회의록") && text.contains("문단 120입니다"))
+    }
+
+    @Test func scriptsInMarkdownDoNotRun() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "md-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let input = directory.appending(path: "script.md")
+        try "본문\n\n<script>document.body.innerHTML = 'REPLACED'</script>\n".write(to: input, atomically: true, encoding: .utf8)
+        let output = directory.appending(path: "script.pdf")
+        try await MarkdownConverter().convert(input, to: output)
+        let text = PDFDocument(url: output)?.page(at: 0)?.string ?? ""
+        #expect(text.contains("본문"))
+        #expect(!text.contains("REPLACED"))
+    }
+}

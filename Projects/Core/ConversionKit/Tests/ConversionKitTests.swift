@@ -42,6 +42,11 @@ import Testing
         #expect(Formats.outputs(for: URL(filePath: "/tmp/take.aif")).map(\.ext) == ["mp3", "m4a", "wav"])
     }
 
+    @Test func markdownBecomesPDFOrHTML() {
+        #expect(Formats.outputs(for: URL(filePath: "/tmp/README.md")).map(\.ext) == ["pdf", "html"])
+        #expect(Formats.outputs(for: URL(filePath: "/tmp/notes.markdown")).first?.caption.hasPrefix("추천") == true)
+    }
+
     @Test func unknownFilesHaveNoOutputs() {
         #expect(Formats.outputs(for: URL(filePath: "/tmp/archive.zip")).isEmpty)
     }

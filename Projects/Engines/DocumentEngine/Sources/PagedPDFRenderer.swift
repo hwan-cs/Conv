@@ -63,7 +63,11 @@ public final class PagedPDFRenderer {
 
         let contentWidth = page.paperSize.width - page.margins.left - page.margins.right
         let frame = CGRect(x: 0, y: 0, width: contentWidth, height: page.paperSize.height)
-        let webView = WKWebView(frame: frame)
+        let configuration = WKWebViewConfiguration()
+        // Pages are documents, never apps: scripts in them (a <script> in Markdown) don't run.
+        // The renderer's own evaluateJavaScript calls are unaffected.
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+        let webView = WKWebView(frame: frame, configuration: configuration)
         // The print system needs the web view in a window; this one is never shown.
         let window = NSWindow(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
         window.contentView = webView
