@@ -19,17 +19,56 @@ enum HwpFonts {
         /// How the face Hangul would use advances, and how the chosen face does.
         var target: Advances
         var actual: Advances
+        /// The bundled face the family names, which the page must embed for WebKit to find.
+        var bundled: Bundled?
     }
+
+    /// Nanum Gothic and Myeongjo (SIL OFL), shipped in the engine's resources. They are named
+    /// "Conv …" in pages so a different installed version can't take their place.
+    enum Bundled: String, CaseIterable, Sendable {
+        case gothic = "NanumGothic"
+        case myeongjo = "NanumMyeongjo"
+
+        var cssFamily: String { self == .gothic ? "Conv Nanum Gothic" : "Conv Nanum Myeongjo" }
+
+        func url(bold: Bool) -> URL? {
+            Bundle.module.url(forResource: "\(rawValue)-\(bold ? "Bold" : "Regular")", withExtension: "ttf", subdirectory: "Fonts")
+                ?? Bundle.module.url(forResource: "\(rawValue)-\(bold ? "Bold" : "Regular")", withExtension: "ttf")
+        }
+
+        /// `@font-face` rules with the faces inline: WebKit lays pages out in another process,
+        /// which doesn't see fonts registered in this one.
+        var fontFaces: String {
+            [false, true].compactMap { bold -> String? in
+                guard let url = url(bold: bold), let data = try? Data(contentsOf: url) else { return nil }
+                return "@font-face { font-family: '\(cssFamily)'; font-weight: \(bold ? 700 : 400); src: url(data:font/ttf;base64,\(data.base64EncodedString())) format('truetype'); }"
+            }.joined(separator: "\n")
+        }
+    }
+
+    /// Makes the bundled faces available to CoreText here, for measuring. Safe to call repeatedly.
+    static func registerBundled() {
+        _ = registration
+    }
+
+    private static let registration: Void = {
+        for face in Bundled.allCases {
+            for bold in [false, true] {
+                if let url = face.url(bold: bold) { CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil) }
+            }
+        }
+    }()
 
     // Measured with CoreText at 100pt.
     static let hamchoromDotum = Advances(hangul: 0.97, latin: 0.494, space: 0.3)
     static let hamchoromBatang = Advances(hangul: 0.97, latin: 0.508, space: 0.3)
     static let fullWidth = Advances(hangul: 1.0, latin: 0.5, space: 0.333)
 
-    /// Stand-ins, best first. Nanum's widths are closest to 함초롬's, and its serif has a bold;
-    /// WebKit fakes AppleMyungjo's bold by drawing text several times, which repeats it in the PDF's text.
-    static let serifStandIns = ["Nanum Myeongjo", "AppleMyungjo"]
-    static let sansStandIns = ["Nanum Gothic", "Apple SD Gothic Neo"]
+    /// Stand-ins: the bundled Nanum faces, whose widths are closest to 함초롬's and whose serif has
+    /// a bold (WebKit fakes AppleMyungjo's bold by drawing text several times, which repeats it in
+    /// the PDF's text). The system faces are only a fallback should the resources be missing.
+    static let systemSerif = "AppleMyungjo"
+    static let systemSans = "Apple SD Gothic Neo"
 
     private static let serifHints = ["바탕", "명조", "Batang", "Myeongjo", "Myungjo", "신명", "궁서", "Gungsuh", "Times", "Serif", "serif", "필기", "펜"]
     /// Windows' classic Korean faces, whose Hangul is a full em wide.
@@ -38,6 +77,7 @@ enum HwpFonts {
     private static let cache = Cache()
 
     static func choice(for font: HwpDocument.Font?) -> Choice {
+        registerBundled()
         let names = [font?.name, font?.fallback].compactMap { $0 }
         let key = names.joined(separator: "|")
         if let cached = cache.value(for: key) { return cached }
@@ -56,13 +96,22 @@ enum HwpFonts {
             let advances = measure(installed)
             return Choice(family: (quoted + [serif ? "serif" : "sans-serif"]).joined(separator: ","), target: advances, actual: advances)
         }
-        let candidates = serif ? serifStandIns : sansStandIns
-        let standIn = candidates.first(where: isInstalled) ?? candidates[candidates.count - 1]
-        return Choice(
-            family: "'\(standIn)',\(serif ? "serif" : "sans-serif")",
-            target: matches(fullWidthHints) ? fullWidth : serif ? hamchoromBatang : hamchoromDotum,
-            actual: measure(standIn)
-        )
+        let target = matches(fullWidthHints) ? fullWidth : serif ? hamchoromBatang : hamchoromDotum
+        let bundled: Bundled = serif ? .myeongjo : .gothic
+        let system = serif ? systemSerif : systemSans
+        if bundled.url(bold: false) != nil, isRegistered(postScriptName: bundled.rawValue) {
+            return Choice(
+                family: "'\(bundled.cssFamily)','\(system)',\(serif ? "serif" : "sans-serif")",
+                target: target,
+                actual: measure(bundled.rawValue),
+                bundled: bundled
+            )
+        }
+        return Choice(family: "'\(system)',\(serif ? "serif" : "sans-serif")", target: target, actual: measure(system))
+    }
+
+    private static func isRegistered(postScriptName name: String) -> Bool {
+        CTFontCopyPostScriptName(CTFontCreateWithName(name as CFString, 12, nil)) as String == name
     }
 
     private static func isInstalled(_ name: String) -> Bool {

@@ -1213,8 +1213,11 @@ struct HwpHTMLWriter {
         """
 
     static func htmlPage(_ body: String, bleed: Double = bleed) -> String {
-        """
+        // Only the bundled faces the page uses are embedded; each is a few megabytes.
+        let fontFaces = HwpFonts.Bundled.allCases.filter { body.contains($0.cssFamily) }.map(\.fontFaces).joined(separator: "\n")
+        return """
         <!doctype html><html><head><meta charset="utf-8"><style>
+        \(fontFaces)
         * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { margin: 0; }
         body { padding: 0 \(decimal(bleed))pt; overflow-x: clip; }
