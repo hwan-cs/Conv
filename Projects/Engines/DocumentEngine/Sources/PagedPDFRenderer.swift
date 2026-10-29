@@ -55,6 +55,7 @@ public final class PagedPDFRenderer {
         baseURL: URL?,
         to output: URL,
         page: PageSetup = .a4,
+        script: String? = nil,
         timeout: Duration = .seconds(60)
     ) async throws {
         // Unhosted processes (tests, the XPC service) have no NSApplication until asked for one.
@@ -72,6 +73,8 @@ public final class PagedPDFRenderer {
         // WebKit prints CSS at 16/15 of its size (96/72 px-to-pt times its 1.25 minimum shrink),
         // so a 10pt font would print at 10.67pt. Zooming by the inverse keeps CSS units physical.
         _ = try? await webView.evaluateJavaScript("document.documentElement.style.zoom = '\(Self.physicalZoom)'")
+        // Adjustments that need the laid-out page, run before it is printed.
+        if let script { _ = try? await webView.evaluateJavaScript(script) }
 
         let info = NSPrintInfo()
         info.paperSize = page.paperSize

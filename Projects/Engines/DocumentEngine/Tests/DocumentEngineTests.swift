@@ -255,3 +255,67 @@ struct DocxSampleTests {
         }
     }
 }
+
+/// Run with `TEST_RUNNER_CONV_SAMPLES=… TEST_RUNNER_CONV_SAMPLES_OUT=… xcodebuild test`.
+@MainActor
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["CONV_SAMPLES"] != nil))
+struct HwpSampleTests {
+    @Test func convertSamples() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        let input = URL(filePath: try #require(environment["CONV_SAMPLES"]), directoryHint: .isDirectory)
+        let output = URL(filePath: try #require(environment["CONV_SAMPLES_OUT"]), directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        let samples = try FileManager.default.contentsOfDirectory(at: input, includingPropertiesForKeys: nil)
+            .filter { ["hwp", "hwpx"].contains($0.pathExtension) }
+        for sample in samples {
+            let name = sample.deletingPathExtension().lastPathComponent
+            let started = ContinuousClock.now
+            do {
+                for (index, html) in try HwpPDFConverter().html(for: sample).enumerated() {
+                    try html.write(to: output.appending(path: "\(name)-\(index).html"), atomically: true, encoding: .utf8)
+                }
+                try await HwpPDFConverter().convert(sample, to: output.appending(path: "\(name).pdf"))
+                print("SAMPLE \(name): ok in \(ContinuousClock.now - started)")
+            } catch {
+                Issue.record("\(name): \(error)")
+            }
+        }
+    }
+}
+
+@Suite struct HwpEquationTests {
+    @Test func overDividesTheChunksAroundIt() {
+        #expect(HwpEquation.mathML("x+y over x-y") == "<math><mfrac><mrow><mi>x</mi><mo>+</mo><mi>y</mi></mrow><mrow><mi>x</mi><mo>−</mo><mi>y</mi></mrow></mfrac></math>")
+        #expect(HwpEquation.mathML("{x} over {k} = 1").hasPrefix("<math><mrow><mfrac><mrow><mi>x</mi></mrow><mrow><mi>k</mi></mrow></mfrac>"))
+    }
+
+    @Test func rootsTakeTheChunkAfterThem() {
+        #expect(HwpEquation.mathML("sqrt x+y").contains("<msqrt><mrow><mi>x</mi><mo>+</mo><mi>y</mi></mrow></msqrt>"))
+        #expect(HwpEquation.mathML("root 3 of x").contains("<mroot><mi>x</mi><mn>3</mn></mroot>"))
+    }
+
+    @Test func unbracedLimitRunsToTheNextSpace() {
+        let math = HwpEquation.mathML("lim_x->0 f(x)")
+        #expect(math.contains("<munder><mi mathvariant=\"normal\">lim</mi><mrow><mi>x</mi><mo>→</mo><mn>0</mn></mrow></munder>"))
+    }
+
+    @Test func keywordsAndRunTogetherWords() {
+        let math = HwpEquation.mathML("rmP + alpha CDOTS cosA")
+        #expect(math.contains("<mi mathvariant=\"normal\">P</mi>"))
+        #expect(math.contains("α") && math.contains("⋯"))
+        #expect(math.contains("<mi mathvariant=\"normal\">cos</mi>"))
+    }
+
+    @Test func matricesSplitOnAmpersandAndHash() {
+        let math = HwpEquation.mathML("pmatrix{1&&2#3&&4}")
+        #expect(math.contains("<mtr><mtd><mrow><mn>1</mn></mrow></mtd><mtd><mrow><mn>2</mn></mrow></mtd></mtr>"))
+        #expect(math.contains("<mtr><mtd><mrow><mn>3</mn></mrow></mtd><mtd><mrow><mn>4</mn></mrow></mtd></mtr>"))
+    }
+}
+
+extension HwpEquationTests {
+    @Test func capitalizedKeywordsInsideWords() {
+        let math = HwpEquation.mathML("ACUPB")
+        #expect(math == "<math><mrow><mi>A</mi><mo>∪</mo><mi>B</mi></mrow></math>")
+    }
+}
