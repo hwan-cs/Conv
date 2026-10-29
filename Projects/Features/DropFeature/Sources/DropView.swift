@@ -1,11 +1,14 @@
 import ConversionKit
 import DesignSystem
+import Platform
 import SwiftUI
 import UniformTypeIdentifiers
 
 /// Main window: empty → drag over → pick format → converting → done.
 public struct DropView: View {
     @State private var model = DropModel()
+    /// Files sent from the menu bar or pasted there.
+    private let inbox = ConversionInbox.shared
     @State private var isTargeted = false
     @State private var isImporting = false
 
@@ -31,6 +34,13 @@ public struct DropView: View {
                     .hidden()
             }
             .animation(ConvMotion.dragEnter, value: isTargeted)
+            .onAppear(perform: takeDelivery)
+            .onChange(of: inbox.delivery) { takeDelivery() }
+    }
+
+    private func takeDelivery() {
+        guard model.phase != .converting, let delivery = inbox.take() else { return }
+        model.accept(delivery.urls, isPasted: delivery.isPasted)
     }
 
     @ViewBuilder
@@ -439,7 +449,7 @@ private struct DoneScreen: View {
                 .foregroundStyle(ConvColor.ink)
             VStack(alignment: .leading, spacing: 4) {
                 if model.finishedCount > 0 {
-                    Text("원본은 그대로 두고, 바뀐 파일은 원본 옆에 놓았어요.")
+                    Text(model.items.contains(where: \.isPasted) ? "고른 곳에 저장했어요." : "원본은 그대로 두고, 바뀐 파일은 원본 옆에 놓았어요.")
                 }
                 ForEach(model.failedItems) { item in
                     if case .failed(let message) = item.status {

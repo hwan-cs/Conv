@@ -29,6 +29,8 @@ public final class DropModel {
         public let id = UUID()
         public let url: URL
         public let size: Int64?
+        /// Made from the clipboard in the app's own folder, so there is no "beside the original".
+        public var isPasted = false
         /// Quick Look's preview, once it has made one.
         public var thumbnail: CGImage?
         public var status: Status = .waiting
@@ -80,13 +82,15 @@ public final class DropModel {
         return (Double(settledCount) + current) / Double(max(items.count, 1))
     }
 
-    public func accept(_ urls: [URL]) {
+    public func accept(_ urls: [URL], isPasted: Bool = false) {
+        // Files arriving mid-conversion would be dropped from the list being converted.
+        guard phase != .converting else { return }
         let files = urls.filter { !$0.hasDirectoryPath }
         guard !files.isEmpty else { return }
         items = files.map { url in
             withAccess(url) {
                 let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init)
-                return Item(url: url, size: size)
+                return Item(url: url, size: size, isPasted: isPasted)
             }
         }
         for item in items { loadThumbnail(for: item) }
@@ -123,6 +127,9 @@ public final class DropModel {
         for index in items.indices {
             items[index].status = .converting(nil)
             items[index].status = await convert(items[index], to: output)
+            if case .done(let written) = items[index].status {
+                ConversionHistory.shared.record(input: items[index].url, output: written)
+            }
         }
         phase = .done
     }
@@ -143,6 +150,7 @@ public final class DropModel {
         }
         defer { try? converted.close() }
         do {
+            guard !item.isPasted else { throw CocoaError(.fileWriteNoPermission) }
             return .done(try SiblingWriter.copy(converted, nextTo: item.url, extension: output.ext))
         } catch {
             // A same-named file is already there, or the folder is off limits: ask where to put it.
@@ -158,9 +166,14 @@ public final class DropModel {
 
     private func askWhereToSave(_ item: Item, output: Formats.Output) -> URL? {
         let panel = NSSavePanel()
-        panel.directoryURL = item.url.deletingLastPathComponent()
         panel.nameFieldStringValue = SiblingWriter.sibling(of: item.url, extension: output.ext).lastPathComponent
-        panel.message = "같은 이름의 파일이 있어요. 어디에 저장할까요?"
+        if item.isPasted {
+            panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+            panel.message = "클립보드에서 가져온 이미지예요. 어디에 저장할까요?"
+        } else {
+            panel.directoryURL = item.url.deletingLastPathComponent()
+            panel.message = "같은 이름의 파일이 있어요. 어디에 저장할까요?"
+        }
         if let type = UTType(filenameExtension: output.ext) { panel.allowedContentTypes = [type] }
         return panel.runModal() == .OK ? panel.url : nil
     }
