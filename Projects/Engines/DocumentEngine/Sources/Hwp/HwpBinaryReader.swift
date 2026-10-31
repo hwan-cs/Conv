@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Builds an `HwpDocument` from the records of a .hwp 5.x file.
@@ -103,12 +104,39 @@ struct HwpBinaryReader {
             ))
         }
         reader.skip(6) // Diagonal.
-        var fill: HwpDocument.Color?
-        if reader.uint32() & 1 != 0 {
+        let fill = Self.fill(&reader)
+        return HwpDocument.BorderFill(left: sides[0], right: sides[1], top: sides[2], bottom: sides[3], fill: fill.color, image: fill.image)
+    }
+
+    /// 채우기 정보: a color, a gradation, a picture, each present by its bit in the type.
+    static func fill(_ reader: inout ByteReader) -> (color: HwpDocument.Color?, image: HwpDocument.ImageFill?) {
+        guard reader.remaining >= 4 else { return (nil, nil) }
+        let type = reader.uint32()
+        var color: HwpDocument.Color?
+        if type & 1 != 0 {
             // Hatch patterns are drawn as their background color.
-            fill = HwpDocument.Color(colorRef: reader.uint32())
+            color = HwpDocument.Color(colorRef: reader.uint32())
+            reader.skip(8) // Pattern color and kind.
         }
-        return HwpDocument.BorderFill(left: sides[0], right: sides[1], top: sides[2], bottom: sides[3], fill: fill)
+        if type & 4 != 0 {
+            // A gradation is drawn as its first color.
+            reader.skip(10) // Kind, angle, center, blur.
+            let count = Int(reader.int16())
+            guard count > 0, count < 1000 else { return (color, nil) }
+            if count > 2 { reader.skip(count * 4) }
+            let first = reader.uint32()
+            reader.skip((count - 1) * 4)
+            if color == nil { color = HwpDocument.Color(colorRef: first) }
+        }
+        var image: HwpDocument.ImageFill?
+        if type & 2 != 0, reader.remaining >= 6 {
+            let code = Int(reader.uint8())
+            reader.skip(2) // Brightness, contrast.
+            let effect = HwpDocument.Picture.Effect(code: Int(reader.uint8()))
+            let binID = Int(reader.uint16())
+            if binID > 0 { image = HwpDocument.ImageFill(binID: binID, code: code, effect: effect) }
+        }
+        return (color, image)
     }
 
     private func charShape(_ reader: inout ByteReader) -> HwpDocument.CharShape {
@@ -496,6 +524,13 @@ struct HwpBinaryReader {
         return String(decoding: bytes, as: UTF8.self)
     }
 
+    /// A shape component's 2×3 matrix: x' = a·x + b·y + c, y' = d·x + e·y + f.
+    static func matrix(_ payload: Data, at offset: Int) -> CGAffineTransform {
+        guard offset + 48 <= payload.count else { return .identity }
+        let value = { payload.double(at: offset + $0 * 8) }
+        return CGAffineTransform(a: value(0), b: value(3), c: value(1), d: value(4), tx: value(2), ty: value(5))
+    }
+
     /// 개체 공통 속성, at the start of a table's, drawing's or equation's CTRL_HEADER.
     static func objectLayout(_ payload: Data) -> HwpDocument.ObjectLayout {
         var reader = ByteReader(payload)
@@ -560,23 +595,44 @@ struct HwpBinaryReader {
     /// A 'gso ' drawing object: its SHAPE_COMPONENT says what it is.
     private func shapeObject(_ node: RecordNode, layout: HwpDocument.ObjectLayout) -> HwpDocument.Control? {
         guard let component = node.children.first(where: { $0.record.tag == HwpTag.shapeComponent }) else { return nil }
-        return shapeComponent(component, layout: layout, topLevel: true)
+        return shapeComponent(component, layout: layout, topLevel: true, parent: (0, 0))
     }
 
-    private func shapeComponent(_ node: RecordNode, layout: HwpDocument.ObjectLayout, topLevel: Bool) -> HwpDocument.Control? {
+    /// - Parameter parent: The enclosing group's corner in the top group's space, for a component
+    ///   inside a group.
+    private func shapeComponent(
+        _ node: RecordNode,
+        layout: HwpDocument.ObjectLayout,
+        topLevel: Bool,
+        parent: (x: Int, y: Int)
+    ) -> HwpDocument.Control? {
         let payload = node.record.payload
         // Top-level components repeat the control id.
         let base = topLevel ? 8 : 4
         let kind = Self.controlID(payload)
-        var layout = layout
-        if !topLevel {
-            layout.inline = false
-            layout.x = Int(payload.int32(at: base))
-            layout.y = Int(payload.int32(at: base + 4))
-            layout.width = Int(payload.uint32(at: base + 20))
-            layout.height = Int(payload.uint32(at: base + 24))
-        }
         let matrixCount = Int(payload.uint16(at: base + 42))
+        var layout = layout
+        var corner = (x: 0, y: 0)
+        if !topLevel {
+            // A grouped component is placed by its matrices, which map its own box into the top
+            // group's space: the translation, then each group's scale and rotation, outermost first.
+            let size = (width: Double(payload.uint32(at: base + 12)), height: Double(payload.uint32(at: base + 16)))
+            // T · S0 · R0 · S1 · R1 …, applied right to left.
+            var transform = CGAffineTransform.identity
+            for index in (0..<matrixCount).reversed() {
+                transform = transform
+                    .concatenating(Self.matrix(payload, at: base + 140 + index * 96))
+                    .concatenating(Self.matrix(payload, at: base + 92 + index * 96))
+            }
+            transform = transform.concatenating(Self.matrix(payload, at: base + 44))
+            let box = CGRect(x: 0, y: 0, width: size.width, height: size.height).applying(transform)
+            corner = (Int(box.minX.rounded()), Int(box.minY.rounded()))
+            layout.inline = false
+            layout.x = corner.x - parent.x
+            layout.y = corner.y - parent.y
+            layout.width = Int(box.width.rounded())
+            layout.height = Int(box.height.rounded())
+        }
         // Line and fill information follow the transformation matrices.
         var reader = ByteReader(payload)
         reader.skip(base + 44 + 48 + matrixCount * 96)
@@ -593,10 +649,7 @@ struct HwpBinaryReader {
             if lineFlags & 0x3F == 0 { line = .none }
         }
         reader.skip(1)
-        var fill: HwpDocument.Color?
-        if reader.remaining >= 4, reader.uint32() & 1 != 0 {
-            fill = HwpDocument.Color(colorRef: reader.uint32())
-        }
+        let fill = Self.fill(&reader)
 
         switch kind {
         case "$pic":
@@ -606,17 +659,19 @@ struct HwpBinaryReader {
             result.layout = layout
             result.binID = Int(data.uint16(at: 71))
             result.crop = (Int(data.int32(at: 44)), Int(data.int32(at: 48)), Int(data.int32(at: 52)), Int(data.int32(at: 56)))
-            result.originalSize = (Int(data.int32(at: 20)), Int(data.int32(at: 28)))
+            // The image rectangle's corners: x, y for top left, top right, bottom right, bottom left.
+            result.extent = (Int(data.int32(at: 28)), Int(data.int32(at: 32)))
+            result.effect = HwpDocument.Picture.Effect(code: data.count > 70 ? Int(data[data.startIndex + 70]) : 0)
             result.border = line
             return .picture(result)
         case "$con":
             var shape = HwpDocument.Shape(layout: layout)
             shape.children = node.children
                 .filter { $0.record.tag == HwpTag.shapeComponent }
-                .compactMap { shapeComponent($0, layout: layout, topLevel: false) }
+                .compactMap { shapeComponent($0, layout: layout, topLevel: false, parent: corner) }
             return .shape(shape)
         default:
-            var shape = HwpDocument.Shape(layout: layout, line: line, fill: fill)
+            var shape = HwpDocument.Shape(layout: layout, line: line, fill: fill.color, image: fill.image)
             if let geometry = node.children.first(where: {
                 [HwpTag.shapeComponentLine, HwpTag.shapeComponentRectangle, HwpTag.shapeComponentEllipse].contains($0.record.tag)
             }) {

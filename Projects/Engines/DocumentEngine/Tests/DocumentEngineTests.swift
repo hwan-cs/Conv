@@ -320,6 +320,59 @@ extension HwpEquationTests {
     }
 }
 
+@Suite struct HwpPictureTests {
+    private func picture(box: (Int, Int), crop: (Int, Int, Int, Int), extent: (Int, Int) = (0, 0)) -> HwpDocument.Picture {
+        var picture = HwpDocument.Picture()
+        picture.layout.width = box.0
+        picture.layout.height = box.1
+        picture.crop = crop
+        picture.extent = extent
+        return picture
+    }
+
+    @Test func cropShowsOnlyItsPartScaledToTheBox() throws {
+        // A 1366×768 screenshot (75 units a pixel) cropped to a title in its corner.
+        let cropped = picture(box: (20385, 6176), crop: (868, 2250, 31532, 11537))
+        let frame = try #require(HwpHTMLWriter.cropFrame(cropped, pixels: CGSize(width: 1366, height: 768)))
+        let scale = 20385.0 / 30664
+        #expect(frame.x == Int((-868 * scale).rounded()))
+        #expect(frame.width == Int((102450 * scale).rounded()))
+        #expect(frame.y < 0 && frame.height > 6176)
+    }
+
+    @Test func aResizedPictureIsDrawnWhole() {
+        // The crop covers the image, give or take a pixel; only the box is smaller.
+        let resized = picture(box: (16902, 7623), crop: (0, 0, 29880, 15300), extent: (15254, 7793))
+        #expect(HwpHTMLWriter.cropFrame(resized, pixels: CGSize(width: 398, height: 204)) == nil)
+    }
+
+    @Test func withoutPixelsTheImageRectangleGivesTheFullSize() throws {
+        let cropped = picture(box: (1000, 500), crop: (0, 0, 50000, 25000), extent: (100000, 50000))
+        let frame = try #require(HwpHTMLWriter.cropFrame(cropped, pixels: nil))
+        #expect(frame.x == 0 && frame.y == 0 && frame.width == 2000 && frame.height == 1000)
+    }
+
+    @Test func grayEffectDropsColor() throws {
+        let context = try #require(CGContext(data: nil, width: 2, height: 1, bitsPerComponent: 8, bytesPerRow: 8, space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.setFillColor(CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 2, height: 1))
+        let red = try #require(Self.pngData(context.makeImage()))
+        let png = try #require(HwpHTMLWriter.png(from: red))
+        let gray = try #require(HwpHTMLWriter.grayPNG(from: png, blackAndWhite: false))
+        let image = try #require(CGImageSourceCreateWithData(gray as CFData, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
+        let pixel = try #require(image.dataProvider?.data as Data?)
+        #expect(pixel[0] == pixel[1] && pixel[1] == pixel[2])
+    }
+
+    private static func pngData(_ image: CGImage?) -> Data? {
+        guard let image else { return nil }
+        let output = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(output, "public.png" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(destination, image, nil)
+        return CGImageDestinationFinalize(destination) ? output as Data : nil
+    }
+}
+
 @MainActor
 @Suite(.timeLimit(.minutes(1))) struct MarkdownConverterTests {
     static let sample = """

@@ -99,6 +99,32 @@ struct HwpDocument {
         var top: Border = .none
         var bottom: Border = .none
         var fill: Color?
+        var image: ImageFill?
+    }
+
+    /// A picture filling a box (채우기 › 그림).
+    struct ImageFill {
+        enum Mode { case tile, stretch, center }
+        var binID: Int
+        var mode: Mode
+        var effect: Picture.Effect = .none
+
+        /// HWP's 그림 채우기 유형: 0 바둑판식 전체 … 5 크기에 맞추어, 6 가운데 ….
+        init(binID: Int, code: Int, effect: Picture.Effect = .none) {
+            self.binID = binID
+            self.effect = effect
+            mode = switch code {
+            case 0...4: .tile
+            case 5: .stretch
+            default: .center
+            }
+        }
+
+        init(binID: Int, mode: Mode, effect: Picture.Effect = .none) {
+            self.binID = binID
+            self.mode = mode
+            self.effect = effect
+        }
     }
 
     struct TabDef {
@@ -306,10 +332,34 @@ struct HwpDocument {
     struct Picture {
         var layout = ObjectLayout()
         var binID = 0
+        /// The part of the image shown, in the image's own units: 75 per pixel (96 dpi in HWPUNIT).
         var crop: (left: Int, top: Int, right: Int, bottom: Int) = (0, 0, 0, 0)
-        /// Size of the image before cropping, for scaling the crop rectangle.
-        var originalSize: (width: Int, height: Int) = (0, 0)
+        /// The image rectangle's far corner. In those same units when the picture was cropped in
+        /// Hangul; otherwise the size it is drawn at.
+        var extent: (width: Int, height: Int) = (0, 0)
+        var effect: Effect = .none
         var border: Border = .none
+
+        /// 그림 효과.
+        enum Effect {
+            case none, grayscale, blackAndWhite
+
+            init(code: Int) {
+                self = switch code {
+                case 1: .grayscale
+                case 2: .blackAndWhite
+                default: .none
+                }
+            }
+
+            init(hwpx: String?) {
+                self = switch hwpx {
+                case "GRAY_SCALE": .grayscale
+                case "BLACK_WHITE": .blackAndWhite
+                default: .none
+                }
+            }
+        }
     }
 
     struct Shape {
@@ -318,6 +368,7 @@ struct HwpDocument {
         var kind: Kind = .other
         var line: Border = .none
         var fill: Color?
+        var image: ImageFill?
         /// Radius as a percent of the shorter side, for rounded rectangles.
         var cornerRatio = 0
         /// Line endpoints in the shape's own box, for `.line`.

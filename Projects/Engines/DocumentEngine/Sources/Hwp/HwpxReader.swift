@@ -117,6 +117,7 @@ struct HwpxReader {
             bottom: side("bottomBorder")
         )
         fill.fill = element.descendant(named: "winBrush").flatMap { Self.color($0.string("faceColor")) }
+        fill.image = imageFill(element.descendant(named: "imgBrush"))
         return fill
     }
 
@@ -445,6 +446,13 @@ struct HwpxReader {
             picture.layout = layout
             picture.binID = element.descendant(named: "img").flatMap { $0.string("binaryItemIDRef") }.flatMap { binIDs[$0] } ?? 0
             picture.border = Self.line(element.child(named: "lineShape"))
+            if let clip = element.child(named: "imgClip") {
+                picture.crop = (clip.int("left"), clip.int("top"), clip.int("right"), clip.int("bottom"))
+            }
+            if let corner = element.child(named: "imgRect")?.child(named: "pt2") {
+                picture.extent = (corner.int("x"), corner.int("y"))
+            }
+            picture.effect = HwpDocument.Picture.Effect(hwpx: element.descendant(named: "img")?.string("effect"))
             return .picture(picture)
         case "equation":
             return .equation(.init(
@@ -460,10 +468,22 @@ struct HwpxReader {
         }
     }
 
+    /// 그림 채우기: `<hc:imgBrush mode="…"><hc:img binaryItemIDRef="…"/>`.
+    private func imageFill(_ brush: XMLElement?) -> HwpDocument.ImageFill? {
+        guard let brush, let id = brush.descendant(named: "img")?.string("binaryItemIDRef"), let binID = binIDs[id] else { return nil }
+        let mode: HwpDocument.ImageFill.Mode = switch brush.string("mode") {
+        case "TILE", "TILE_HORZ_TOP", "TILE_HORZ_BOTTOM", "TILE_VERT_LEFT", "TILE_VERT_RIGHT": .tile
+        case "TOTAL", "FIT_TO_SIZE": .stretch
+        default: .center
+        }
+        return HwpDocument.ImageFill(binID: binID, mode: mode, effect: .init(hwpx: brush.descendant(named: "img")?.string("effect")))
+    }
+
     private func shape(_ element: XMLElement, layout: HwpDocument.ObjectLayout) -> HwpDocument.Shape {
         var shape = HwpDocument.Shape(layout: layout)
         shape.line = Self.line(element.child(named: "lineShape"))
         shape.fill = element.child(named: "fillBrush")?.child(named: "winBrush").flatMap { Self.color($0.string("faceColor")) }
+        shape.image = imageFill(element.child(named: "fillBrush")?.child(named: "imgBrush"))
         switch element.localName {
         case "rect":
             shape.kind = .rectangle

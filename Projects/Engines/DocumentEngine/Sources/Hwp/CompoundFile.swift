@@ -171,6 +171,10 @@ extension Data {
         return UInt32(self[i]) | UInt32(self[i + 1]) << 8 | UInt32(self[i + 2]) << 16 | UInt32(self[i + 3]) << 24
     }
 
+    func double(at offset: Int) -> Double {
+        Double(bitPattern: UInt64(uint32(at: offset)) | UInt64(uint32(at: offset + 4)) << 32)
+    }
+
     func int32(at offset: Int) -> Int32 {
         Int32(bitPattern: uint32(at: offset))
     }

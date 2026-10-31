@@ -11,6 +11,14 @@ struct HwpHTMLWriter {
 
     private let document: HwpDocument
     private var images: [Int: String] = [:]
+    /// Pixel sizes of those images, for cropping.
+    private var imageSizes: [Int: CGSize] = [:]
+    private var effectImages: [ImageKey: String] = [:]
+
+    private struct ImageKey: Hashable {
+        let id: Int
+        let effect: HwpDocument.Picture.Effect
+    }
     /// The current paragraph's line gap: Hangul adds it below a line that holds an object, as below text.
     private var objectGap = 0
     /// Numbering counters by numbering id, one per level.
@@ -967,7 +975,7 @@ struct HwpHTMLWriter {
         border.style == nil ? 0 : max(border.width * 72 / 25.4, 0.5)
     }
 
-    private func boxStyle(_ fill: HwpDocument.BorderFill) -> String {
+    private mutating func boxStyle(_ fill: HwpDocument.BorderFill) -> String {
         var style = ""
         for (name, border) in [("left", fill.left), ("right", fill.right), ("top", fill.top), ("bottom", fill.bottom)] {
             if let line = border.style {
@@ -975,7 +983,19 @@ struct HwpHTMLWriter {
             }
         }
         if let color = fill.fill { style += "background:\(color.css);" }
+        if let image = fill.image { style += imageFillStyle(image) }
         return style
+    }
+
+    private mutating func imageFillStyle(_ fill: HwpDocument.ImageFill) -> String {
+        let source = imageSource(fill.binID, effect: fill.effect)
+        guard !source.isEmpty else { return "" }
+        let placement = switch fill.mode {
+        case .tile: "background-repeat:repeat;"
+        case .stretch: "background-size:100% 100%;background-repeat:no-repeat;"
+        case .center: "background-position:center;background-repeat:no-repeat;"
+        }
+        return "background-image:url(\(source));\(placement)"
     }
 
     // MARK: Objects
@@ -986,16 +1006,86 @@ struct HwpHTMLWriter {
     }
 
     private mutating func picture(_ picture: HwpDocument.Picture) -> String {
-        let source = imageSource(picture.binID)
+        let source = imageSource(picture.binID, effect: picture.effect)
         let size = "width:\(decimal(pt(picture.layout.width)))pt;height:\(decimal(pt(picture.layout.height)))pt;"
         var style = size
         if let line = picture.border.style {
             style += "outline:\(decimal(picture.border.width * 72 / 25.4))pt \(line.css) \(picture.border.color.css);"
         }
-        if picture.layout.inline {
-            return "<img src=\"\(source)\" style=\"\(style)vertical-align:bottom;\(objectGapMargins)\">"
+        _ = imageSource(picture.binID) // Measures the image for cropping.
+        var image = "<img src=\"\(source)\" style=\"\(style)display:block;\">"
+        if let frame = Self.cropFrame(picture, pixels: imageSizes[picture.binID]) {
+            // The whole image, scaled so the cropped part fills the box, inside a box that hides the rest.
+            let imageStyle = "position:absolute;max-width:none;left:\(decimal(pt(frame.x)))pt;top:\(decimal(pt(frame.y)))pt;width:\(decimal(pt(frame.width)))pt;height:\(decimal(pt(frame.height)))pt;"
+            image = "<span style=\"display:block;position:relative;overflow:hidden;\(style)\"><img src=\"\(source)\" style=\"\(imageStyle)\"></span>"
         }
-        return floating("<img src=\"\(source)\" style=\"\(style)display:block;\">", layout: picture.layout)
+        if picture.layout.inline {
+            return "<span style=\"display:inline-block;vertical-align:bottom;\(objectGapMargins)\">\(image)</span>"
+        }
+        return floating(image, layout: picture.layout)
+    }
+
+    /// Where the whole image goes, in HWPUNIT relative to the picture's box, when only part of it
+    /// shows; nil when it shows whole.
+    ///
+    /// Crop values count 75 per pixel, so the image's full size is its pixel size times 75. Without
+    /// the pixel size, the image rectangle's far corner stands in: it is the full size for pictures
+    /// cropped in Hangul.
+    static func cropFrame(_ picture: HwpDocument.Picture, pixels: CGSize?) -> (x: Int, y: Int, width: Int, height: Int)? {
+        let crop = picture.crop
+        let cropWidth = crop.right - crop.left
+        let cropHeight = crop.bottom - crop.top
+        guard cropWidth > 0, cropHeight > 0 else { return nil }
+        let full: (width: Int, height: Int) = pixels.map { (Int($0.width * 75), Int($0.height * 75)) } ?? picture.extent
+        // Crop values may run a pixel past the edge.
+        let slack = (width: max(full.width / 100, 75), height: max(full.height / 100, 75))
+        if crop.left <= slack.width, crop.top <= slack.height, crop.right >= full.width - slack.width, crop.bottom >= full.height - slack.height {
+            return nil
+        }
+        let whole = (width: max(full.width, crop.right), height: max(full.height, crop.bottom))
+        let scaleX = Double(picture.layout.width) / Double(cropWidth)
+        let scaleY = Double(picture.layout.height) / Double(cropHeight)
+        return (
+            Int((-Double(crop.left) * scaleX).rounded()), Int((-Double(crop.top) * scaleY).rounded()),
+            Int((Double(whole.width) * scaleX).rounded()), Int((Double(whole.height) * scaleY).rounded())
+        )
+    }
+
+    /// The image as a data URL, drawn in gray for 그림 효과: WebKit leaves CSS filters out of PDFs.
+    private mutating func imageSource(_ id: Int, effect: HwpDocument.Picture.Effect) -> String {
+        guard effect != .none else { return imageSource(id) }
+        let key = ImageKey(id: id, effect: effect)
+        if let cached = effectImages[key] { return cached }
+        guard let item = document.binData[id], let data = try? item.data(),
+              let gray = Self.grayPNG(from: data, blackAndWhite: effect == .blackAndWhite) else { return imageSource(id) }
+        let source = "data:image/png;base64,\(gray.base64EncodedString())"
+        effectImages[key] = source
+        return source
+    }
+
+    static func grayPNG(from data: Data, blackAndWhite: Bool) -> Data? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
+              let context = CGContext(
+                  data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ),
+              let pixels = context.data?.assumingMemoryBound(to: UInt8.self) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        for index in stride(from: 0, to: image.width * image.height * 4, by: 4) {
+            let luma = (299 * Int(pixels[index]) + 587 * Int(pixels[index + 1]) + 114 * Int(pixels[index + 2])) / 1000
+            // Channels are premultiplied by alpha: black and white splits at half of it.
+            let alpha = Int(pixels[index + 3])
+            let value = UInt8(blackAndWhite ? (luma * 2 >= alpha ? alpha : 0) : luma)
+            pixels[index] = value
+            pixels[index + 1] = value
+            pixels[index + 2] = value
+        }
+        guard let gray = context.makeImage() else { return nil }
+        let output = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(output, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(destination, gray, nil)
+        return CGImageDestinationFinalize(destination) ? output as Data : nil
     }
 
     private mutating func imageSource(_ id: Int) -> String {
@@ -1014,6 +1104,11 @@ struct HwpHTMLWriter {
         }
         let source = "data:\(type);base64,\(data.base64EncodedString())"
         images[id] = source
+        if let image = CGImageSourceCreateWithData(data as CFData, nil),
+           let properties = CGImageSourceCopyPropertiesAtIndex(image, 0, nil) as? [CFString: Any],
+           let width = properties[kCGImagePropertyPixelWidth] as? Int, let height = properties[kCGImagePropertyPixelHeight] as? Int {
+            imageSizes[id] = CGSize(width: width, height: height)
+        }
         return source
     }
 
@@ -1095,6 +1190,7 @@ struct HwpHTMLWriter {
                 style += "border:\(decimal(max(shape.line.width * 72 / 25.4, 0.5)))pt \(line.css) \(shape.line.color.css);"
             }
             if let fill = shape.fill { style += "background:\(fill.css);" }
+            if let image = shape.image { style += imageFillStyle(image) }
             if shape.kind == .ellipse { style += "border-radius:50%;" }
             if shape.cornerRatio > 0 {
                 style += "border-radius:\(decimal(min(width, height) * Double(shape.cornerRatio) / 100))pt;"
