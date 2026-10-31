@@ -16,22 +16,21 @@ let sandbox: Entitlements = .dictionary([
 
 /// Files Conv opens, without claiming to be their default app, and the outputs it writes beside
 /// them. `NSIsRelatedItemType` is what lets the sandboxed app create "보고서.pdf" next to "보고서.docx".
+/// The entries have no `CFBundleTypeName`: Finder shows a claiming app's name as a file's kind
+/// when the default app gives none (it showed "Converted File" for every .mp4), and without one it
+/// falls back to the type's own description, "MPEG-4 movie".
 let documentTypes: Plist.Value = [
     [
-        "CFBundleTypeName": "Convertible File",
         "CFBundleTypeRole": "Viewer",
         "LSHandlerRank": "None",
         "LSItemContentTypes": [
             "org.openxmlformats.wordprocessingml.document", "net.daringfireball.markdown",
             "public.image", "public.movie", "public.audio",
         ],
-        "CFBundleTypeExtensions": [
-            "docx", "hwp", "hwpx", "md", "markdown", "heic", "heif", "jpg", "jpeg", "png", "webp", "tiff", "tif", "gif", "bmp", "avif",
-            "mov", "mp4", "m4v", "m4a", "mp3", "wav", "aiff", "aif", "caf", "aac", "flac",
-        ],
+        // HWP has no system type to name.
+        "CFBundleTypeExtensions": ["hwp", "hwpx"],
     ],
     [
-        "CFBundleTypeName": "Converted File",
         "CFBundleTypeRole": "Editor",
         "LSHandlerRank": "None",
         "LSItemContentTypes": [
@@ -39,7 +38,6 @@ let documentTypes: Plist.Value = [
             "com.microsoft.bmp", "public.avif", "public.mpeg-4", "com.apple.quicktime-movie",
             "com.apple.m4a-audio", "public.mp3", "com.microsoft.waveform-audio", "public.aiff-audio", "public.html",
         ],
-        "CFBundleTypeExtensions": ["pdf", "jpg", "png", "heic", "tiff", "gif", "bmp", "avif", "mp4", "mov", "m4a", "mp3", "wav", "aiff", "html"],
         "NSIsRelatedItemType": true,
     ],
 ]
