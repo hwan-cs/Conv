@@ -835,7 +835,8 @@ struct HwpHTMLWriter {
         let isLatin = script == 1 || script == 4
         let target = isLatin ? font.target.latin : font.target.hangul
         let actual = isLatin ? font.actual.latin : font.actual.hangul
-        let letterSpacing = target * ratio - actual + extra
+        // Tighter than this, glyphs overlap; the page script narrows the line instead.
+        let letterSpacing = max(target * ratio - actual + extra, -Self.tightestSpacing)
         let wordSpacing = font.target.space * ratio - font.actual.space + extra - letterSpacing
         // The zero-width strut must stay zero-width, or a full-width table after it wraps.
         let isStrut = text == "\u{200B}"
@@ -1144,6 +1145,8 @@ struct HwpHTMLWriter {
     }
 
     static let bleed = 4.0
+    /// The most letter spacing may take away, in em, before a line is narrowed instead.
+    static let tightestSpacing = 0.08
 
     /// Squeezes lines that Hangul fit and the substitute faces don't, by tightening their spacing.
     static let fitLines = """
@@ -1196,18 +1199,35 @@ struct HwpHTMLWriter {
                 tab.style.lineHeight = 'normal';
             }
         }
-        // Lines: squeeze those that Hangul fit and the stand-in faces don't.
+        // Lines: squeeze those that Hangul fit and the stand-in faces don't, by tightening their
+        // spacing while the glyphs stay apart, and past that by narrowing the glyphs, as a
+        // condensed face or 장평 would.
         for (const line of document.querySelectorAll('.line')) {
             const over = line.scrollWidth - line.clientWidth;
             if (over <= 0.5) continue;
-            const spans = line.querySelectorAll(':scope > span');
+            const spans = [...line.querySelectorAll(':scope > span')];
             let characters = 0;
             for (const span of spans) characters += span.textContent.length;
             if (characters === 0) continue;
             const step = over / characters;
+            // A few characters, like a list number in a narrow cell, just tighten.
+            const mayNarrow = line.textContent.replace(/\\u200B/g, '').trim().length > 3;
+            let narrow = false;
             for (const span of spans) {
-                const current = parseFloat(getComputedStyle(span).letterSpacing) || 0;
-                span.style.letterSpacing = (current - step) + 'px';
+                const style = getComputedStyle(span);
+                const current = parseFloat(style.letterSpacing) || 0;
+                const tightest = -\(tightestSpacing) * parseFloat(style.fontSize);
+                if (!mayNarrow || current - step >= tightest) {
+                    span.style.letterSpacing = (current - step) + 'px';
+                    continue;
+                }
+                narrow = true;
+                span.style.letterSpacing = Math.min(current, tightest) + 'px';
+            }
+            const left = line.scrollWidth - line.clientWidth;
+            if (narrow && left > 0.5) {
+                line.style.transformOrigin = '0 50%';
+                line.style.transform = 'scaleX(' + (line.clientWidth / line.scrollWidth) + ')';
             }
         }
         """
@@ -1222,7 +1242,7 @@ struct HwpHTMLWriter {
         body { margin: 0; }
         body { padding: 0 \(decimal(bleed))pt; overflow-x: clip; }
         /* Not <p>: the HTML parser ends a paragraph at a <table> or <div> inside it. */
-        .p { margin: 0; position: relative; white-space: pre-wrap; overflow-wrap: break-word; line-height: 0; tab-size: 40pt; }
+        .p { margin: 0; position: relative; white-space: pre-wrap; overflow-wrap: break-word; line-height: 0; tab-size: 40pt; text-align-last: auto; }
         .line { display: block; white-space: pre; }
         table { border-collapse: collapse; table-layout: fixed; }
         td { overflow-wrap: anywhere; }
