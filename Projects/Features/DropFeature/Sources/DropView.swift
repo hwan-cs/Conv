@@ -40,7 +40,11 @@ public struct DropView: View {
 
     private func takeDelivery() {
         guard model.phase != .converting, let delivery = inbox.take() else { return }
-        model.accept(delivery.urls, isPasted: delivery.isPasted)
+        if delivery.needsFolderAccess {
+            model.explainFolderAccess(for: delivery.urls)
+            return
+        }
+        model.accept(delivery.urls, isPasted: delivery.isPasted, format: delivery.format)
     }
 
     @ViewBuilder
@@ -49,7 +53,7 @@ public struct DropView: View {
             DragOverScreen()
         } else {
             switch model.phase {
-            case .empty: EmptyScreen(notice: model.notice) { isImporting = true }
+            case .empty: EmptyScreen(notice: model.notice, offersSettings: model.noticeNeedsFolderAccess) { isImporting = true }
             case .picking: PickScreen(model: model)
             case .converting: ConvertingScreen(model: model)
             case .done: DoneScreen(model: model)
@@ -85,7 +89,9 @@ private final class URLCollector: @unchecked Sendable {
 
 private struct EmptyScreen: View {
     let notice: String?
+    var offersSettings = false
     let open: () -> Void
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(spacing: 14) {
@@ -109,10 +115,15 @@ private struct EmptyScreen: View {
             }
             .buttonStyle(.plain)
             if let notice {
-                Text(notice)
-                    .font(ConvFont.sans(13))
-                    .foregroundStyle(ConvColor.errorText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 12) {
+                    Text(notice)
+                        .font(ConvFont.sans(13))
+                        .foregroundStyle(ConvColor.errorText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if offersSettings {
+                        Button("설정 열기") { openSettings() }
+                    }
+                }
             }
         }
     }
@@ -206,6 +217,8 @@ private struct PickScreen: View {
             }
         }
         .animation(ConvMotion.keyPress, value: selected)
+        .onAppear { selected = model.suggested }
+        .onChange(of: model.suggested) { selected = model.suggested }
     }
 }
 

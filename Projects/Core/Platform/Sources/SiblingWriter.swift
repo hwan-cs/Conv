@@ -26,6 +26,28 @@ public enum SiblingWriter {
         try write(nextTo: original, extension: ext) { try copy(handle, to: $0, overwriting: false) }
     }
 
+    /// Like `copy(_:nextTo:extension:)`, but when the name is taken it writes "보고서 2.pdf",
+    /// "보고서 3.pdf"… instead of failing, for conversions with no window to ask in. Only names
+    /// other than the related item's need the folder to be granted.
+    public static func copyKeepingBoth(_ handle: FileHandle, nextTo original: URL, extension ext: String) throws -> URL {
+        for number in 1...99 {
+            let target = numbered(sibling(of: original, extension: ext), number)
+            do {
+                return try write(to: target, primary: original) { try copy(handle, to: $0, overwriting: false) }
+            } catch WriteError.exists {
+                continue
+            }
+        }
+        throw WriteError.exists(sibling(of: original, extension: ext))
+    }
+
+    /// "보고서.pdf" for 1, "보고서 2.pdf" for 2, as Finder numbers copies.
+    public static func numbered(_ url: URL, _ number: Int) -> URL {
+        guard number > 1 else { return url }
+        let base = url.deletingPathExtension().lastPathComponent
+        return url.deletingLastPathComponent().appending(path: "\(base) \(number)").appendingPathExtension(url.pathExtension)
+    }
+
     /// Streams into a place the user chose in a save panel; its URL is already granted.
     public static func copy(_ handle: FileHandle, to url: URL) throws {
         try copy(handle, to: url, overwriting: true)
@@ -45,7 +67,10 @@ public enum SiblingWriter {
     }
 
     private static func write(nextTo original: URL, extension ext: String, _ body: (URL) throws -> Void) throws -> URL {
-        let target = sibling(of: original, extension: ext)
+        try write(to: sibling(of: original, extension: ext), primary: original, body)
+    }
+
+    private static func write(to target: URL, primary original: URL, _ body: (URL) throws -> Void) throws -> URL {
         let presenter = RelatedItemPresenter(primary: original, item: target)
         NSFileCoordinator.addFilePresenter(presenter)
         defer { NSFileCoordinator.removeFilePresenter(presenter) }

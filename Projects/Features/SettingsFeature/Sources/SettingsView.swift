@@ -1,3 +1,5 @@
+import AppKit
+import FinderSync
 import Platform
 import SwiftUI
 
@@ -9,6 +11,7 @@ public struct SettingsView: View {
     public var body: some View {
         Form {
             LabeledContent("버전", value: AppInfo.version)
+            FinderMenuSection()
             Section("오픈소스 라이선스") {
                 ForEach(OpenSourceLicense.all) { license in
                     Button {
@@ -75,5 +78,58 @@ private struct LicenseSheet: View {
         }
         .padding(20)
         .frame(width: 560, height: 520)
+    }
+}
+
+/// Finder's "conv.로 바꾸기": off until the user turns the extension on, and it works only in
+/// folders allowed here, since a sandboxed app can't read files Finder merely names.
+private struct FinderMenuSection: View {
+    @State private var access = FolderAccess.shared
+    @State private var isEnabled = FIFinderSyncController.isExtensionEnabled
+
+    var body: some View {
+        Section {
+            LabeledContent("Finder 확장") {
+                HStack(spacing: 8) {
+                    Text(isEnabled ? "켜짐" : "꺼짐")
+                        .foregroundStyle(isEnabled ? .primary : .secondary)
+                    Button(isEnabled ? "관리…" : "켜기…") {
+                        FIFinderSyncController.showExtensionManagementInterface()
+                    }
+                }
+            }
+            ForEach(access.folders, id: \.self) { folder in
+                HStack {
+                    Image(systemName: "folder")
+                        .foregroundStyle(.secondary)
+                    Text(folder.path(percentEncoded: false))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Button("빼기") { access.remove(folder) }
+                }
+            }
+            HStack {
+                Text(access.folders.isEmpty ? "허용한 폴더가 없어요" : "다른 폴더도 허용할 수 있어요")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("폴더 허용…") { access.grant() }
+            }
+        } header: {
+            Text("Finder 우클릭 메뉴")
+        } footer: {
+            Text("""
+            1. Finder 확장을 켜요. 시스템 설정에서 Conv를 체크하면 돼요.
+            2. 바꿀 파일이 있는 폴더를 허용해요. 홈 폴더를 고르면 그 안 어디서든 쓸 수 있어요.
+            3. Finder에서 파일을 우클릭하고 "conv.로 바꾸기"에서 포맷을 골라요.
+            """)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        // The switch lives in System Settings; check again on coming back.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            isEnabled = FIFinderSyncController.isExtensionEnabled
+        }
     }
 }

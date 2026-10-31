@@ -10,6 +10,8 @@ let version: [String: Plist.Value] = [
 let sandbox: Entitlements = .dictionary([
     "com.apple.security.app-sandbox": true,
     "com.apple.security.files.user-selected.read-write": true,
+    // Folders allowed for Finder's menu stay allowed across launches.
+    "com.apple.security.files.bookmarks.app-scope": true,
 ])
 
 /// Files Conv opens, without claiming to be their default app, and the outputs it writes beside
@@ -113,7 +115,14 @@ let finderSync = Target.target(
             "NSExtensionPrincipalClass": "$(PRODUCT_MODULE_NAME).FinderSync",
         ],
     ]) { $1 }),
-    sources: ["FinderSync/Sources/**"],
+    // An app extension can't link a static framework, so it compiles the two ConversionKit files
+    // it needs: the same format table the app uses, and the notification's name.
+    sources: [
+        "FinderSync/Sources/**",
+        "../Core/ConversionKit/Sources/Formats.swift",
+        "../Core/ConversionKit/Sources/FinderFormatNotification.swift",
+    ],
+    // Sends paths only; the app reads them through folders the user allowed in Settings.
     entitlements: .dictionary(["com.apple.security.app-sandbox": true]),
     dependencies: [.sdk(name: "FinderSync", type: .framework)],
     settings: .settings(base: Conv.baseSettings)

@@ -42,8 +42,12 @@ public final class DropModel {
     public private(set) var phase: Phase = .empty
     public private(set) var items: [Item] = []
     public private(set) var output: Formats.Output?
+    /// Selected on the pick screen when it opens; still converted only once confirmed.
+    public private(set) var suggested: Formats.Output?
     /// Why the last drop couldn't be used, shown on the empty screen.
     public private(set) var notice: String?
+    /// The notice is about Finder's menu needing a folder allowed in Settings.
+    public private(set) var noticeNeedsFolderAccess = false
 
     private let client: ConversionClient
 
@@ -82,7 +86,8 @@ public final class DropModel {
         return (Double(settledCount) + current) / Double(max(items.count, 1))
     }
 
-    public func accept(_ urls: [URL], isPasted: Bool = false) {
+    /// - Parameter format: A format picked elsewhere (Finder's menu), shown selected.
+    public func accept(_ urls: [URL], isPasted: Bool = false, format: String? = nil) {
         // Files arriving mid-conversion would be dropped from the list being converted.
         guard phase != .converting else { return }
         let files = urls.filter { !$0.hasDirectoryPath }
@@ -102,6 +107,8 @@ public final class DropModel {
             return
         }
         notice = nil
+        noticeNeedsFolderAccess = false
+        suggested = outputs.first { $0.ext == format }
         phase = .picking
     }
 
@@ -115,7 +122,17 @@ public final class DropModel {
         items = []
         output = nil
         notice = nil
+        noticeNeedsFolderAccess = false
         phase = .empty
+    }
+
+    /// Finder sent files from a folder Conv may not read yet.
+    public func explainFolderAccess(for files: [URL]) {
+        guard phase != .converting else { return }
+        reset()
+        let folder = files.first?.deletingLastPathComponent().path(percentEncoded: false) ?? ""
+        notice = "Finder에서 바로 바꾸려면 설정에서 이 폴더(또는 그 위 폴더)를 허용해 주세요: \(folder)"
+        noticeNeedsFolderAccess = true
     }
 
     public func revealOutputs() {

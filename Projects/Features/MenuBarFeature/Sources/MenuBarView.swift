@@ -9,9 +9,13 @@ struct MenuBarView: View {
     let close: () -> Void
     @State private var notice: String?
     private let history = ConversionHistory.shared
+    private let quiet = QuietConversions.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if let job = quiet.current {
+                converting(job)
+            }
             pasteCard
             if let notice {
                 Text(notice)
@@ -67,6 +71,29 @@ struct MenuBarView: View {
                 }
         }
         .buttonStyle(.plain)
+    }
+
+    /// Finder's conversion running in the background.
+    private func converting(_ job: QuietConversions.Job) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text("바꾸는 중")
+                    .font(ConvFont.sans(11, .semibold))
+                    .foregroundStyle(ConvColor.muted)
+                Text(job.files[min(quiet.fileIndex, job.files.count - 1)].lastPathComponent)
+                    .font(ConvFont.mono(11, .bold))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 8)
+                if job.files.count > 1 {
+                    Text("\(quiet.fileIndex + 1)/\(job.files.count)")
+                        .font(ConvFont.mono(11))
+                        .foregroundStyle(ConvColor.muted)
+                }
+            }
+            ProgressView(value: quiet.progress)
+                .tint(ConvColor.ink)
+        }
     }
 
     private var recent: some View {
