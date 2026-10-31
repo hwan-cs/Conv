@@ -24,6 +24,7 @@ struct HwpBinaryReader {
         let records = try file.docInfo()
         var fontCounts: [Int] = []
         var fontIndex = 0
+        var binCount = 0
         for record in records {
             var reader = ByteReader(record.payload)
             switch record.tag {
@@ -32,7 +33,10 @@ struct HwpBinaryReader {
                 _ = reader.int32()
                 fontCounts = (0..<7).map { _ in Int(reader.int32()) }
             case HwpTag.binData:
-                if let (id, item) = binItem(record.payload) { document.binData[id] = item }
+                // Pictures name an item by its place among these records, not by its storage's
+                // number (BIN0006 may come first).
+                binCount += 1
+                if let item = binItem(record.payload) { document.binData[binCount] = item }
             case HwpTag.faceName:
                 let flags = reader.uint8()
                 let name = reader.string()
@@ -74,7 +78,7 @@ struct HwpBinaryReader {
         }
     }
 
-    private func binItem(_ payload: Data) -> (Int, HwpDocument.BinItem)? {
+    private func binItem(_ payload: Data) -> HwpDocument.BinItem? {
         var reader = ByteReader(payload)
         let flags = reader.uint16()
         guard flags & 0xF != 0 else { return nil } // Linked files are outside the document.
@@ -82,7 +86,7 @@ struct HwpBinaryReader {
         let ext = flags & 0xF == 1 ? reader.string() : "ole"
         let name = String(format: "BIN%04X.%@", id, ext)
         let file = file
-        return (id, HwpDocument.BinItem(extension: ext.lowercased()) { try file.binData(named: name) })
+        return HwpDocument.BinItem(extension: ext.lowercased()) { try file.binData(named: name) }
     }
 
     private func borderFill(_ reader: inout ByteReader) -> HwpDocument.BorderFill {
