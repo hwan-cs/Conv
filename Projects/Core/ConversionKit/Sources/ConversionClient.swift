@@ -21,8 +21,7 @@ public final class ConversionClient: @unchecked Sendable {
         connection.invalidate()
     }
 
-    /// Converts the file at `input` into `format` in the sandboxed service, and returns the result
-    /// open for reading. The caller must be able to read `input` (security scope already started).
+    /// Converts the file at `input` into `format` in the sandboxed service, and returns the result open for reading.
     /// - Parameter onProgress: Called with 0…1 as the service reports it, on an XPC queue.
     public func convert(
         _ input: URL,
@@ -30,7 +29,9 @@ public final class ConversionClient: @unchecked Sendable {
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> FileHandle {
         let handle = try FileHandle(forReadingFrom: input)
-        defer { try? handle.close() }
+        defer {
+            try? handle.close()
+        }
         return try await call(onProgress) { service, job, reply in
             service.convert(handle, named: input.lastPathComponent, to: format, job: job, withReply: reply)
         }
@@ -43,15 +44,16 @@ public final class ConversionClient: @unchecked Sendable {
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> PackedFiles.Reader {
         let handle = try FileHandle(forReadingFrom: input)
-        defer { try? handle.close() }
+        defer {
+            try? handle.close()
+        }
         let packed = try await call(onProgress) { service, job, reply in
             service.convertPages(handle, named: input.lastPathComponent, to: format, job: job, withReply: reply)
         }
         return try PackedFiles.Reader(packed)
     }
 
-    /// The files at `inputs` made into one `format` file, in order. More than the service takes in
-    /// one message are combined in parts, and the parts combined again.
+    /// The files at `inputs` made into one `format` file, in order.
     public func combine(
         _ inputs: [URL],
         to format: String,
@@ -61,8 +63,14 @@ public final class ConversionClient: @unchecked Sendable {
         let chunks = stride(from: 0, to: inputs.count, by: limit).map { Array(inputs[$0..<min($0 + limit, inputs.count)]) }
         var parts: [FileHandle] = []
         for (index, chunk) in chunks.enumerated() {
-            let handles = try chunk.map { try FileHandle(forReadingFrom: $0) }
-            defer { for handle in handles { try? handle.close() } }
+            let handles = try chunk.map {
+                try FileHandle(forReadingFrom: $0)
+            }
+            defer {
+                for handle in handles {
+                    try? handle.close()
+                }
+            }
             let part = try await combine(handles, named: chunk.map(\.lastPathComponent), to: format) { fraction in
                 onProgress((Double(index) + fraction) / Double(chunks.count))
             }
@@ -85,7 +93,13 @@ public final class ConversionClient: @unchecked Sendable {
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> FileHandle {
         try await call(onProgress) { service, job, reply in
-            service.combine(handles, named: names, to: format, job: job, withReply: reply)
+            service.combine(
+                handles,
+                named: names,
+                to: format,
+                job: job,
+                withReply: reply
+            )
         }
     }
 
@@ -96,19 +110,27 @@ public final class ConversionClient: @unchecked Sendable {
     ) async throws -> FileHandle {
         let job = UUID().uuidString
         progress.register(job, onProgress)
-        defer { progress.unregister(job) }
+        defer {
+            progress.unregister(job)
+        }
         return try await withCheckedThrowingContinuation { continuation in
             let resumed = Once()
             let service = connection.remoteObjectProxyWithErrorHandler { error in
-                // The service crashed or quit (it exits after a timed-out render); launchd relaunches it.
-                if resumed.claim() { continuation.resume(throwing: Failure(description: "변환 서비스가 멈췄어요: \(error.localizedDescription)")) }
+                if resumed.claim() {
+                    continuation.resume(throwing: Failure(description: "변환 서비스가 멈췄어요: \(error.localizedDescription)"))
+                }
             } as? ConversionServiceProtocol
+            
             guard let service else {
-                if resumed.claim() { continuation.resume(throwing: Failure(description: "변환 서비스에 연결할 수 없어요")) }
+                if resumed.claim() {
+                    continuation.resume(throwing: Failure(description: "변환 서비스에 연결할 수 없어요"))
+                }
                 return
             }
             send(service, job) { output, error in
-                guard resumed.claim() else { return }
+                guard resumed.claim() else {
+                    return
+                }
                 if let output {
                     continuation.resume(returning: output)
                 } else {
@@ -145,7 +167,9 @@ private final class Once: @unchecked Sendable {
 
     func claim() -> Bool {
         lock.withLock {
-            defer { done = true }
+            defer {
+                done = true
+            }
             return !done
         }
     }

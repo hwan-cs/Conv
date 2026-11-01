@@ -33,6 +33,15 @@ public struct DropView: View {
                     .disabled(model.phase == .converting)
                     .hidden()
             }
+            .toolbar {
+                // Where Mac apps keep it: top right of the window, beside ⌘, in the app menu.
+                ToolbarItem(placement: .primaryAction) {
+                    SettingsLink {
+                        Label("설정", systemImage: "gearshape")
+                    }
+                    .help("설정 (⌘,)")
+                }
+            }
             .animation(ConvMotion.dragEnter, value: isTargeted)
             .onAppear(perform: takeDelivery)
             .onChange(of: inbox.delivery) { takeDelivery() }

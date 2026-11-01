@@ -439,6 +439,28 @@ extension HwpEquationTests {
         #expect(try XMLDocument(xmlString: body, options: []).rootElement() != nil)
     }
 
+    /// Word keeps a three-column section's text side by side; WebKit alone would print one column.
+    @MainActor
+    @Test func columnsSurviveIntoThePDF() async throws {
+        var document = document()
+        document.sections[0].columns = 3
+        document.sections[0].columnGap = 1134
+        document.sections[0].paragraphs = (1...120).map { HwpDocument.Paragraph(content: [.text("문단 \($0)", charShapeID: 0)]) }
+        let docx = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).docx")
+        let pdf = docx.deletingPathExtension().appendingPathExtension("pdf")
+        defer { [docx, pdf].forEach { try? FileManager.default.removeItem(at: $0) } }
+        var writer = HwpDocxWriter(document: document)
+        try writer.write(to: docx)
+        try await DocxPDFConverter().convert(docx, to: pdf)
+
+        let rendered = try #require(PDFDocument(url: pdf))
+        #expect(rendered.pageCount == 1)
+        let page = try #require(rendered.page(at: 0))
+        let last = try #require(rendered.findString("문단 120", withOptions: []).first)
+        // In the third column, near the top: not further down one long column.
+        #expect(last.bounds(for: page).minX > page.bounds(for: .mediaBox).width / 2)
+    }
+
     @Test func equationsBecomeOfficeMath() throws {
         let omml = HwpOfficeMath.omml(HwpEquation.mathML("{a} over {b} + sqrt {x}"), size: 1000)
         #expect(omml.hasPrefix("<m:oMath>"))

@@ -15,21 +15,25 @@ struct ConvApp: App {
         ConvFont.register()
         #if DEBUG
         if XPCSpike.isRequested {
-            DispatchQueue.main.async { XPCSpike.run() }
+            DispatchQueue.main.async {
+                XPCSpike.run()
+            }
         }
         if XPCSpike.isConvertRequested {
-            DispatchQueue.main.async { XPCSpike.runConvert() }
+            DispatchQueue.main.async {
+                XPCSpike.runConvert()
+            }
         }
         #endif
     }
 
     var body: some Scene {
-        // One main window: the menu bar opens this same one rather than another.
         Window("Conv", id: "main") {
             DropView()
                 .background(MainWindowRegistrar())
         }
         .windowResizability(.contentSize)
+        .windowToolbarStyle(.unifiedCompact)
 
         Settings {
             SettingsView()
@@ -41,7 +45,6 @@ struct ConvApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBar: MenuBarController?
 
-    /// Finder requests already taken: the extension may post one more than once.
     private var handled: Set<UUID> = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -51,14 +54,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    /// Finder's "conv.로 바꾸기": paths and the format picked. They can be read only inside folders
-    /// the user allowed in Settings; otherwise the window says how to allow them.
+    /// Finder's "conv.로 바꾸기": paths and the format picked. They can be read only inside folders the user allowed in Settings
     @objc private func finderRequested(_ notification: Notification) {
-        guard let message = notification.object as? String, let request = FinderRequest(encoded: message) else { return }
-        guard handled.insert(request.id).inserted else { return }
+        guard let message = notification.object as? String, let request = FinderRequest(encoded: message) else {
+            return
+        }
+        guard handled.insert(request.id).inserted else {
+            return
+        }
+        
         let files = request.paths.map { URL(filePath: $0) }
         let allowed = FolderAccess.shared.covers(files)
-        // A format picked, in an allowed folder: converted beside the files without a window.
+        
         if allowed, let format = request.format {
             QuietConversions.shared.convert(files, to: format)
             return
@@ -67,22 +74,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainWindow.show()
     }
 
-    /// The menu bar item stays, so closing the window doesn't quit.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
 
-    /// Files opened with Conv: "다음으로 열기", dropping on the Dock icon.
     func application(_ application: NSApplication, open urls: [URL]) {
         let files = urls.filter(\.isFileURL)
-        guard !files.isEmpty else { return }
+        guard !files.isEmpty else {
+            return
+        }
         ConversionInbox.shared.send(files)
         MainWindow.show()
     }
 
-    /// Clicking the Dock icon with no window open brings the main window back.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { MainWindow.show() }
+        if !flag {
+            MainWindow.show()
+        }
         return true
     }
 }
@@ -95,14 +103,14 @@ private struct MainWindowRegistrar: View {
         Color.clear
             .onAppear {
                 let open = openWindow
-                MainWindow.register { open(id: "main") }
+                MainWindow.register {
+                    open(id: "main")
+                }
             }
             .background(QuietLaunchCloser())
     }
 }
 
-/// Finder's menu launched Conv only to convert in the background: the window SwiftUI opens at
-/// launch is closed before it is shown. It opens again from the menu bar or the Dock.
 private struct QuietLaunchCloser: NSViewRepresentable {
     @MainActor static var pending = CommandLine.arguments.contains(FinderRequest.quietLaunchArgument)
 
@@ -112,9 +120,11 @@ private struct QuietLaunchCloser: NSViewRepresentable {
     private final class WindowWatcher: NSView {
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            guard let window, QuietLaunchCloser.pending else { return }
+            guard let window, QuietLaunchCloser.pending else {
+                return
+            }
             QuietLaunchCloser.pending = false
-            // SwiftUI orders the window front after this; close it once it has.
+            
             window.alphaValue = 0
             DispatchQueue.main.async {
                 window.close()

@@ -7,7 +7,9 @@ import Platform
 /// sandboxed XPC service, writes `conv-spike/xpc.pdf` and `xpc.log` into the app's temporary
 /// directory, then quits.
 enum XPCSpike {
-    static var isRequested: Bool { CommandLine.arguments.contains("--spike-xpc-pdf") }
+    static var isRequested: Bool {
+        CommandLine.arguments.contains("--spike-xpc-pdf")
+    }
 
     @MainActor
     static func run() {
@@ -25,13 +27,17 @@ enum XPCSpike {
         let finish: @Sendable (String) -> Void = { message in
             let line = "\(message) after \(String(format: "%.2f", Date().timeIntervalSince(started)))s\n"
             try? Data(line.utf8).write(to: log)
-            DispatchQueue.main.async { NSApp.terminate(nil) }
+            DispatchQueue.main.async {
+                NSApp.terminate(nil)
+            }
         }
         let service = connection.remoteObjectProxyWithErrorHandler { @Sendable error in
             finish("xpc error: \(error)")
         } as? ConversionServiceProtocol
         service?.renderPDF(fromHTML: html) { @Sendable data, error in
-            guard let data else { return finish("render error: \(error ?? "unknown")") }
+            guard let data else {
+                return finish("render error: \(error ?? "unknown")")
+            }
             do {
                 try data.write(to: pdf)
                 finish("ok \(data.count) bytes")
@@ -48,7 +54,9 @@ enum XPCSpike {
 
     /// `--spike-format gif`: that format instead, for the files that can become it.
     private static var requestedFormat: String? {
-        CommandLine.arguments.firstIndex(of: "--spike-format").flatMap { CommandLine.arguments.dropFirst($0 + 1).first }
+        CommandLine.arguments.firstIndex(of: "--spike-format").flatMap {
+            CommandLine.arguments.dropFirst($0 + 1).first
+        }
     }
 
     @MainActor
@@ -78,7 +86,7 @@ enum XPCSpike {
                     lines.append("fail \(file.lastPathComponent): \(error)")
                 }
             }
-            // Then the images and PDFs there, all in one PDF.
+
             let combinable = files.filter { Formats.outputs(for: [$0, $0]).contains(where: \.combines) }.sorted { $0.lastPathComponent < $1.lastPathComponent }
             if combinable.count > 1 {
                 do {

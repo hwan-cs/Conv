@@ -16,8 +16,9 @@ public struct DocxPDFConverter {
     public func convert(_ input: URL, to output: URL) async throws {
         let document = try DocxHTMLWriter.convert(input)
         let renderer = PagedPDFRenderer()
+        let script = document.html.contains("data-columns=") ? DocxHTMLWriter.columnScript : nil
         guard !document.headerFooter.isEmpty else {
-            try await renderer.render(html: document.html, baseURL: nil, to: output, page: document.page)
+            try await renderer.render(html: document.html, baseURL: nil, to: output, page: document.page, script: script)
             return
         }
 
@@ -28,7 +29,7 @@ public struct DocxPDFConverter {
         let body = work.appending(path: "body.pdf")
         let overlay = work.appending(path: "overlay.pdf")
 
-        try await renderer.render(html: document.html, baseURL: nil, to: body, page: document.page)
+        try await renderer.render(html: document.html, baseURL: nil, to: body, page: document.page, script: script)
         guard let rendered = PDFDocument(url: body) else { throw ConversionError.unreadableIntermediate }
         let starts = Self.sectionStarts(document.headerFooter.sections, in: rendered)
         let overlayHTML = document.headerFooter.overlayHTML(pageCount: rendered.pageCount, sectionStarts: starts)

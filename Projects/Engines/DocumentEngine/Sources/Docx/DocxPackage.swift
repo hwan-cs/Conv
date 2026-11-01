@@ -8,6 +8,8 @@ enum OOXMLNamespace {
     static let a = "http://schemas.openxmlformats.org/drawingml/2006/main"
     static let v = "urn:schemas-microsoft-com:vml"
     static let wps = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+    static let wpg = "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+    static let pic = "http://schemas.openxmlformats.org/drawingml/2006/picture"
 }
 
 /// The zip container of a .docx and its main document part.

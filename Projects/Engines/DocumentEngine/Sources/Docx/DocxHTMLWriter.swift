@@ -18,6 +18,8 @@ struct DocxHTMLWriter {
     private let page: PagedPDFRenderer.PageSetup
     /// The section being written; floating objects are placed against its column.
     private var section: PagedPDFRenderer.PageSetup
+    /// Width of one of the section's text columns.
+    private var columnWidth = 0.0
     private var numbering: DocxNumbering
     private var html = ""
     /// Formatting from the enclosing table's style, applied to paragraphs in its cells.
@@ -66,14 +68,25 @@ struct DocxHTMLWriter {
         )
         for (index, section) in sections.enumerated() {
             writer.section = pageSetup(section.properties)
+            let columns = Self.columns(section.properties)
+            let textWidth = writer.section.paperSize.width - writer.section.margins.left - writer.section.margins.right
+            writer.columnWidth = (textWidth - columns.gap * Double(columns.count - 1)) / Double(columns.count)
             var css = [
                 "padding-left:\(decimal(writer.section.margins.left - page.margins.left))pt",
                 "padding-right:\(decimal(writer.section.margins.right - page.margins.right))pt",
             ]
+            var attributes = ""
+            if columns.count > 1 {
+                // WebKit prints CSS columns as one; `columnScript` lays them out before printing.
+                let height = writer.section.paperSize.height - writer.section.margins.top - writer.section.margins.bottom
+                attributes = #" data-columns="\#(columns.count)" data-gap="\#(decimal(columns.gap))""#
+                    + #" data-width="\#(decimal(writer.columnWidth))" data-height="\#(decimal(height))""#
+                    + (columns.separator ? #" data-separator="1""# : "")
+            }
             if index > 0 && section.properties?.child("type")?.value() != "continuous" {
                 css.append("break-before:page")
             }
-            writer.html += #"<div class="section" style="\#(css.joined(separator: ";"))">"# + "\n"
+            writer.html += #"<div class="section"\#(attributes) style="\#(css.joined(separator: ";"))">"# + "\n"
             writer.blocks(section.elements)
             writer.html += "</div>\n"
         }
@@ -96,6 +109,7 @@ struct DocxHTMLWriter {
         for section in sections {
             let properties = section.properties
             self.section = Self.pageSetup(properties)
+            columnWidth = self.section.paperSize.width - self.section.margins.left - self.section.margins.right
             headerPaths.merge(referencedPaths("headerReference", in: properties)) { $1 }
             footerPaths.merge(referencedPaths("footerReference", in: properties)) { $1 }
             let headers = headerPaths.mapValues { part(at: $0) }
@@ -159,6 +173,14 @@ struct DocxHTMLWriter {
         var properties: XMLElement?
     }
 
+    /// A section's text columns (`w:cols`): how many, the gap between them, and whether a line
+    /// separates them. Columns of unequal widths are drawn equal.
+    private static func columns(_ sectPr: XMLElement?) -> (count: Int, gap: Double, separator: Bool) {
+        guard let cols = sectPr?.child("cols") else { return (1, 0, false) }
+        let count = max(Int(cols.number("num") ?? Double(cols.children("col").count)), 1)
+        return (count, twips(cols.number("space") ?? 720), cols.value("sep").map { $0 == "1" || $0 == "true" } ?? false)
+    }
+
     /// Every section but the last ends with a paragraph whose pPr holds its sectPr; the last one's is the body's.
     private static func sections(of body: XMLElement) -> [Section] {
         var result: [Section] = []
@@ -195,6 +217,7 @@ struct DocxHTMLWriter {
         self.fonts = fonts
         self.page = page
         self.section = page
+        self.columnWidth = page.paperSize.width - page.margins.left - page.margins.right
         self.numbering = numbering
         self.relationships = package.relationships
     }
@@ -280,7 +303,9 @@ struct DocxHTMLWriter {
                 let labelCSS = runCSS(markRun.overlaid(by: labelRun)).joined(separator: ";")
                 content = #"<span class="label" style="\#(width)\#(labelCSS)">\#(Self.escape(label))</span>"# + content
             }
-            html += #"<p style="\#(css.joined(separator: ";"))">\#(content.isEmpty ? "<br>" : content)</p>"# + "\n"
+            // A div rather than <p>: a text box's paragraphs sit inside this one, and HTML would
+            // close a <p> at the first nested one.
+            html += #"<div class="p" style="\#(css.joined(separator: ";"))">\#(content.isEmpty ? "<br>" : content)</div>"# + "\n"
         }
     }
 
@@ -345,6 +370,8 @@ struct DocxHTMLWriter {
                 if element.value("type") == "page" {
                     flush()
                     chunks.append("")
+                } else if element.value("type") == "column" {
+                    text += #"<span data-column-break="1"></span>"#
                 } else {
                     text += "<br>"
                 }
@@ -478,25 +505,107 @@ struct DocxHTMLWriter {
         let height = Self.emu(extent, "cy") ?? 0
         let graphic = container.firstDescendant("graphicData", in: OOXMLNamespace.a)
 
-        if container.localName == "inline" {
-            guard let id = graphic?.firstDescendant("blip", in: OOXMLNamespace.a)?.value("embed", in: OOXMLNamespace.r) else { return "" }
+        let isPicture = graphic?.child("pic", in: OOXMLNamespace.pic) != nil
+        if container.localName == "inline", isPicture {
+            guard let fill = graphic?.firstDescendant("blipFill", in: OOXMLNamespace.pic) else { return "" }
+            if let cropped = croppedPicture(fill, css: ["display:inline-block", "vertical-align:bottom", "width:\(decimal(width))pt", "height:\(decimal(height))pt"]) {
+                return cropped
+            }
+            guard let id = fill.child("blip", in: OOXMLNamespace.a)?.value("embed", in: OOXMLNamespace.r) else { return "" }
             return imageTag(relationship: id, css: ["width:\(decimal(width))pt", "max-width:100%", "height:auto"])
         }
 
         let content: String
-        if let id = graphic?.firstDescendant("blip", in: OOXMLNamespace.a)?.value("embed", in: OOXMLNamespace.r) {
-            content = imageTag(relationship: id, css: ["width:100%", "height:100%"])
-        } else if let shape = graphic?.child("wsp", in: OOXMLNamespace.wps) {
+        if let shape = graphic?.child("wsp", in: OOXMLNamespace.wps) {
             content = self.shape(shape, isLine: height < 1)
+        } else if let group = graphic?.child("wgp", in: OOXMLNamespace.wpg) {
+            content = self.group(group, width: width, height: height)
+        } else if let fill = graphic?.firstDescendant("blipFill", in: OOXMLNamespace.pic) {
+            content = picture(fill)
         } else {
             return ""
         }
-        let box = ["display:block", "width:\(decimal(width))pt", "height:\(decimal(height))pt"] + anchorCSS(container, width: width)
+        let size = ["width:\(decimal(width))pt", "height:\(decimal(height))pt"]
+        if container.localName == "inline" {
+            // A text box or group in the line, as big as Word draws it.
+            let box = ["display:inline-block", "position:relative", "vertical-align:bottom", "text-indent:0"] + size
+            return #"<span style="\#(box.joined(separator: ";"))">\#(content)</span>"#
+        }
+        let box = ["display:block"] + size + anchorCSS(container, width: width)
         return #"<span style="\#(box.joined(separator: ";"))">\#(content)</span>"#
     }
 
+    /// A group's shapes, pictures and inner groups, each placed in the group's own coordinates
+    /// (`chOff`, `chExt`) scaled to the size it is drawn at.
+    private mutating func group(_ group: XMLElement, width: Double, height: Double) -> String {
+        let properties = group.child("grpSpPr", in: OOXMLNamespace.wpg)?.child("xfrm", in: OOXMLNamespace.a)
+        let origin = Self.point(properties?.child("chOff", in: OOXMLNamespace.a), "x", "y")
+        let extent = Self.point(properties?.child("chExt", in: OOXMLNamespace.a), "cx", "cy")
+        let scaleX = extent.x > 0 ? width / extent.x : 1
+        let scaleY = extent.y > 0 ? height / extent.y : 1
+        var children = ""
+        for child in group.elements {
+            let xfrm: XMLElement?
+            switch child.localName {
+            case "wsp": xfrm = child.child("spPr", in: OOXMLNamespace.wps)?.child("xfrm", in: OOXMLNamespace.a)
+            case "pic": xfrm = child.child("spPr", in: OOXMLNamespace.pic)?.child("xfrm", in: OOXMLNamespace.a)
+            case "grpSp": xfrm = child.child("grpSpPr", in: OOXMLNamespace.wpg)?.child("xfrm", in: OOXMLNamespace.a)
+            default: continue
+            }
+            let offset = Self.point(xfrm?.child("off", in: OOXMLNamespace.a), "x", "y")
+            let size = Self.point(xfrm?.child("ext", in: OOXMLNamespace.a), "cx", "cy")
+            let (childWidth, childHeight) = (size.x * scaleX, size.y * scaleY)
+            let content: String
+            switch child.localName {
+            case "wsp": content = shape(child, isLine: childHeight < 1)
+            case "grpSp": content = self.group(child, width: childWidth, height: childHeight)
+            default:
+                guard let fill = child.child("blipFill", in: OOXMLNamespace.pic) else { continue }
+                content = picture(fill)
+            }
+            let css = [
+                "position:absolute", "display:block",
+                "left:\(decimal((offset.x - origin.x) * scaleX))pt", "top:\(decimal((offset.y - origin.y) * scaleY))pt",
+                "width:\(decimal(childWidth))pt", "height:\(decimal(childHeight))pt",
+            ]
+            children += #"<span style="\#(css.joined(separator: ";"))">\#(content)</span>"#
+        }
+        return #"<span style="display:block;position:relative;width:100%;height:100%">\#(children)</span>"#
+    }
+
+    /// A picture filling its box, cropped as `a:srcRect` says.
+    private func picture(_ blipFill: XMLElement) -> String {
+        if let cropped = croppedPicture(blipFill, css: ["display:block", "width:100%", "height:100%"]) { return cropped }
+        guard let id = blipFill.child("blip", in: OOXMLNamespace.a)?.value("embed", in: OOXMLNamespace.r) else { return "" }
+        return imageTag(relationship: id, css: ["display:block", "width:100%", "height:100%"])
+    }
+
+    /// The part of the image `a:srcRect` keeps, in a box of `css` that hides the rest: the image is
+    /// enlarged so the kept part fills the box. Nil when nothing is cropped.
+    private func croppedPicture(_ blipFill: XMLElement, css: [String]) -> String? {
+        guard let id = blipFill.child("blip", in: OOXMLNamespace.a)?.value("embed", in: OOXMLNamespace.r),
+              let crop = blipFill.child("srcRect", in: OOXMLNamespace.a) else { return nil }
+        // Thousandths of a percent of the image, from each edge.
+        let edge = { (name: String) in (crop.attribute(forName: name)?.stringValue).flatMap(Double.init).map { $0 / 100_000 } ?? 0 }
+        let (left, top, right, bottom) = (edge("l"), edge("t"), edge("r"), edge("b"))
+        let keptWidth = 1 - left - right
+        let keptHeight = 1 - top - bottom
+        guard keptWidth > 0, keptHeight > 0, left != 0 || top != 0 || right != 0 || bottom != 0 else { return nil }
+        let image = imageTag(relationship: id, css: [
+            "position:absolute", "max-width:none",
+            "width:\(decimal(100 / keptWidth))%", "height:\(decimal(100 / keptHeight))%",
+            "left:\(decimal(-100 * left / keptWidth))%", "top:\(decimal(-100 * top / keptHeight))%",
+        ])
+        let box = css + ["position:relative", "overflow:hidden"]
+        return #"<span style="\#(box.joined(separator: ";"))">\#(image)</span>"#
+    }
+
+    /// Two EMU attributes as points.
+    private static func point(_ element: XMLElement?, _ x: String, _ y: String) -> CGPoint {
+        CGPoint(x: emu(element, x) ?? 0, y: emu(element, y) ?? 0)
+    }
+
     private func anchorCSS(_ anchor: XMLElement, width: Double) -> [String] {
-        let columnWidth = section.paperSize.width - section.margins.left - section.margins.right
         let horizontal = anchor.child("positionH", in: OOXMLNamespace.wp)
         var left: Double
         switch horizontal?.child("align", in: OOXMLNamespace.wp)?.stringValue {
@@ -542,12 +651,28 @@ struct DocxHTMLWriter {
         }
         var css = ["display:block", "width:100%", "height:100%", "box-sizing:border-box"]
         if let fill { css.append("background:\(fill)") }
+        // A picture filling the shape: stretched over it, or tiled at its own size.
+        if let blipFill = properties?.child("blipFill", in: OOXMLNamespace.a),
+           let id = blipFill.child("blip", in: OOXMLNamespace.a)?.value("embed", in: OOXMLNamespace.r),
+           let uri = dataURI(relationship: id) {
+            let isTiled = blipFill.child("tile", in: OOXMLNamespace.a) != nil
+            css += ["background-image:url(\(uri))", isTiled ? "background-repeat:repeat" : "background-size:100% 100%"]
+        }
         if let outlineColor { css.append("border:\(decimal(outlineWidth))pt solid \(outlineColor)") }
         if geometry == "roundRect" { css.append("border-radius:10%") }
         if geometry == "ellipse" { css.append("border-radius:50%") }
         var text = ""
         if let content = wsp.child("txbx", in: OOXMLNamespace.wps)?.child("txbxContent") {
-            css.append("padding:3.6pt 7.2pt")
+            // Insets default to 0.1 inch at the sides and 0.05 inch above and below.
+            let body = wsp.child("bodyPr", in: OOXMLNamespace.wps)
+            let insets = [("tIns", 3.6), ("rIns", 7.2), ("bIns", 3.6), ("lIns", 7.2)].map { Self.emu(body, $0.0) ?? $0.1 }
+            css.append("padding:" + insets.map { "\(decimal($0))pt" }.joined(separator: " "))
+            css += ["text-indent:0", "overflow:hidden"]
+            switch body?.attribute(forName: "anchor")?.stringValue {
+            case "ctr": css += ["display:flex", "flex-direction:column", "justify-content:center"]
+            case "b": css += ["display:flex", "flex-direction:column", "justify-content:flex-end"]
+            default: break
+            }
             text = rendering { $0.blocks(content.elements) }
         }
         return #"<span style="\#(css.joined(separator: ";"))">\#(text)</span>"#
@@ -590,13 +715,19 @@ struct DocxHTMLWriter {
 
     private func imageTag(relationship id: String, css: [String]) -> String {
         let style = css.joined(separator: ";")
-        guard let path = relationships[id],
-              let mime = Self.imageTypes[URL(filePath: path).pathExtension.lowercased()],
-              let data = try? package.data(at: path) else {
+        guard let uri = dataURI(relationship: id) else {
             // Unsupported formats (EMF, WMF) keep their space so the layout does not shift.
             return #"<span class="missing-image" style="display:inline-block;\#(style)"></span>"#
         }
-        return #"<img src="data:\#(mime);base64,\#(data.base64EncodedString())" style="\#(style)">"#
+        return #"<img src="\#(uri)" style="\#(style)">"#
+    }
+
+    /// The related image as a `data:` URL, for the formats WebKit draws.
+    private func dataURI(relationship id: String) -> String? {
+        guard let path = relationships[id],
+              let mime = Self.imageTypes[URL(filePath: path).pathExtension.lowercased()],
+              let data = try? package.data(at: path) else { return nil }
+        return "data:\(mime);base64,\(data.base64EncodedString())"
     }
 
     private static let imageTypes = [
@@ -620,6 +751,8 @@ struct DocxHTMLWriter {
         let tableBorders = styles.tableBorders(styleID: tableStyle)
             .merging(borders(tblPr?.child("tblBorders"))) { $1 }
         let grid = tbl.child("tblGrid")?.children("gridCol").map { twips($0.number("w") ?? 0) } ?? []
+        // Word's default cell margins: 0.075 inch at the sides, none above and below.
+        let cellMargins = Self.cellMargins(tblPr?.child("tblCellMar"), default: ["top": 0, "right": 5.4, "bottom": 0, "left": 5.4])
 
         var rows: [[Cell]] = []
         var heights: [String?] = []
@@ -663,15 +796,27 @@ struct DocxHTMLWriter {
                 let saved = tableCellFormat
                 tableCellFormat = styles.tableCellFormat(styleID: tableStyle)
                 defer { tableCellFormat = saved }
-                html += tableCell(cell, row: rowIndex, rowCount: rows.count, columnCount: grid.count, tableBorders: tableBorders)
+                html += tableCell(cell, row: rowIndex, rowCount: rows.count, columnCount: grid.count, tableBorders: tableBorders, margins: cellMargins)
             }
             html += "</tr>\n"
         }
         html += "</table>\n"
     }
 
-    private mutating func tableCell(_ cell: Cell, row: Int, rowCount: Int, columnCount: Int, tableBorders: Borders) -> String {
+    /// `w:tblCellMar` or `w:tcMar` in points by side, over `defaults`.
+    private static func cellMargins(_ element: XMLElement?, default defaults: [String: Double]) -> [String: Double] {
+        var margins = defaults
+        for (side, names) in [("top", ["top"]), ("right", ["right", "end"]), ("bottom", ["bottom"]), ("left", ["left", "start"])] {
+            if let width = names.lazy.compactMap({ element?.child($0)?.number("w") }).first { margins[side] = twips(width) }
+        }
+        return margins
+    }
+
+    private mutating func tableCell(
+        _ cell: Cell, row: Int, rowCount: Int, columnCount: Int, tableBorders: Borders, margins tableMargins: [String: Double]
+    ) -> String {
         let tcPr = cell.element.child("tcPr")
+        let margins = Self.cellMargins(tcPr?.child("tcMar"), default: tableMargins)
         let outer = [
             "top": row == 0,
             "bottom": row + cell.rowSpan >= rowCount,
@@ -695,9 +840,10 @@ struct DocxHTMLWriter {
         default: break
         }
 
+        css.append("padding:" + ["top", "right", "bottom", "left"].map { "\(decimal(margins[$0] ?? 0))pt" }.joined(separator: " "))
         let content = rendering { $0.blocks(cell.element.elements) }
 
-        var attributes = ""
+        var attributes = tcPr?.child("noWrap")?.isOn == true ? #" class="nowrap""# : ""
         if cell.span > 1 { attributes += #" colspan="\#(cell.span)""# }
         if cell.rowSpan > 1 { attributes += #" rowspan="\#(cell.rowSpan)""# }
         return #"<td\#(attributes) style="\#(css.joined(separator: ";"))">\#(content)</td>"#
@@ -843,6 +989,63 @@ struct DocxHTMLWriter {
 
     // MARK: - Document
 
+    /// Splits each multi-column section's blocks into pages of side-by-side columns, filled one
+    /// after another as Word does. A block taller than what is left of a column starts the next.
+    /// Runs on the laid-out page, before printing.
+    static let columnScript = """
+    (() => {
+      const ruler = document.createElement('div');
+      ruler.style.height = '100pt';
+      document.body.appendChild(ruler);
+      const pt = ruler.getBoundingClientRect().height / 100;
+      ruler.remove();
+      for (const section of document.querySelectorAll('.section[data-columns]')) {
+        // Widths come in points: the page is laid out again for printing, at another width in pixels.
+        const count = +section.dataset.columns, gap = +section.dataset.gap, width = +section.dataset.width;
+        const height = (+section.dataset.height - 2) * pt;
+        section.style.width = width + 'pt';
+        const blocks = [...section.children];
+        const tops = blocks.map(b => b.getBoundingClientRect().top);
+        const end = section.getBoundingClientRect().bottom;
+        const heights = blocks.map((b, i) => (i + 1 < blocks.length ? tops[i + 1] : end) - tops[i]);
+        section.style.width = '';
+        const pages = [];
+        let column = null, used = 0;
+        const newPage = () => {
+          const page = document.createElement('div');
+          page.style.cssText = 'display:flex;align-items:flex-start;gap:' + gap + 'pt;height:' + (height / pt) + 'pt;overflow:hidden';
+          if (pages.length) page.style.breakBefore = 'page';
+          pages.push(page);
+          return page;
+        };
+        const newColumn = () => {
+          let page = pages[pages.length - 1];
+          if (!page || page.children.length >= count) page = newPage();
+          column = document.createElement('div');
+          column.style.cssText = 'flex:none;position:relative;width:' + width + 'pt';
+          if (section.dataset.separator && page.children.length) {
+            column.style.borderLeft = '0.5pt solid #000';
+            column.style.marginLeft = (-gap / 2) + 'pt';
+            column.style.paddingLeft = (gap / 2) + 'pt';
+          }
+          page.appendChild(column);
+          used = 0;
+        };
+        newColumn();
+        blocks.forEach((block, i) => {
+          // A page break inside the columns starts a new page; the columns carry the break themselves.
+          if (block.style.breakBefore === 'page' && used > 0) { newPage(); newColumn(); }
+          else if (used > 0 && used + heights[i] > height) newColumn();
+          block.style.breakBefore = '';
+          column.appendChild(block);
+          used += heights[i];
+          if (block.querySelector('[data-column-break]')) newColumn();
+        });
+        section.replaceChildren(...pages);
+      }
+    })();
+    """
+
     static func pageSetup(_ sectPr: XMLElement?) -> PagedPDFRenderer.PageSetup {
         guard let sectPr else { return .a4 }
         var page = PagedPDFRenderer.PageSetup.a4
@@ -866,9 +1069,10 @@ struct DocxHTMLWriter {
         \(fontFaces)
         * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { margin: 0; }
-        p { margin: 0; position: relative; white-space: pre-wrap; overflow-wrap: break-word; }
+        .p { margin: 0; position: relative; white-space: pre-wrap; overflow-wrap: break-word; }
         table { border-collapse: collapse; }
         td { padding: 0 5.4pt; vertical-align: top; overflow-wrap: anywhere; }
+        td.nowrap .p { white-space: pre; }
         .tab { display: inline-block; min-width: 36pt; }
         .label { display: inline-block; text-indent: 0; }
         img { vertical-align: bottom; }

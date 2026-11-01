@@ -77,8 +77,14 @@ public final class PagedPDFRenderer {
         // WebKit prints CSS at 16/15 of its size (96/72 px-to-pt times its 1.25 minimum shrink),
         // so a 10pt font would print at 10.67pt. Zooming by the inverse keeps CSS units physical.
         _ = try? await webView.evaluateJavaScript("document.documentElement.style.zoom = '\(Self.physicalZoom)'")
-        // Adjustments that need the laid-out page, run before it is printed.
-        if let script { _ = try? await webView.evaluateJavaScript(script) }
+        // Adjustments that need the laid-out page, run before it is printed. Pictures they move
+        // are decoded again, and the print would otherwise catch some still blank.
+        if let script {
+            _ = try? await webView.callAsyncJavaScript(
+                script + "\nawait Promise.all([...document.images].map(image => image.decode().catch(() => {})));",
+                contentWorld: .page
+            )
+        }
 
         let info = NSPrintInfo()
         info.paperSize = page.paperSize
