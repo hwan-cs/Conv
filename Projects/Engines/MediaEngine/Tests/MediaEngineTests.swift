@@ -1,5 +1,6 @@
 @preconcurrency import AVFoundation
 import Foundation
+import ImageIO
 import Testing
 @testable import MediaEngine
 
@@ -43,6 +44,21 @@ import Testing
         let original = try await AVURLAsset(url: input).load(.duration).seconds
         let rewrapped = try await asset.load(.duration).seconds
         #expect(abs(rewrapped - original) < 0.05, "\(rewrapped)s from \(original)s")
+    }
+
+    @Test func videoBecomesALoopingGIF() async throws {
+        let input = try await writeVideo(named: "clip.mov")
+        let output = directory.appending(path: "clip.gif")
+        try await MediaConverter().convert(input, to: output)
+        let source = try #require(CGImageSourceCreateWithURL(output as CFURL, nil))
+        #expect(CGImageSourceGetType(source) as String? == "com.compuserve.gif")
+        // About a second at 10 frames a second, never made larger than the video.
+        #expect((8...12).contains(CGImageSourceGetCount(source)), "\(CGImageSourceGetCount(source)) frames")
+        let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        #expect(CGSize(width: image.width, height: image.height) == CGSize(width: 64, height: 48))
+        let properties = CGImageSourceCopyProperties(source, nil) as? [CFString: Any]
+        let gif = properties?[kCGImagePropertyGIFDictionary] as? [CFString: Any]
+        #expect(gif?[kCGImagePropertyGIFLoopCount] as? Int == 0)
     }
 
     @Test func soundlessVideoHasNoAudioToExtract() async throws {

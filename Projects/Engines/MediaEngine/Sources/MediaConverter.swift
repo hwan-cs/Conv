@@ -2,7 +2,7 @@
 import Foundation
 
 /// Video and audio through AVFoundation: rewrapping or re-encoding video, and audio to AAC or PCM.
-/// MP3 needs an encoder macOS doesn't have; `MP3Encoder` provides it.
+/// MP3 needs an encoder macOS doesn't have; `MP3Encoder` provides it. `GIFEncoder` makes GIFs.
 public struct MediaConverter: Sendable {
     public enum ConversionError: Error, Equatable {
         case unreadable
@@ -28,6 +28,7 @@ public struct MediaConverter: Sendable {
         case "wav": try await writePCM(asset, to: output, bigEndian: false, progress: progress)
         case "aiff", "aif": try await writePCM(asset, to: output, bigEndian: true, progress: progress)
         case "mp3": try await MP3Encoder().encode(asset, to: output, progress: progress)
+        case "gif": try await GIFEncoder().encode(asset, to: output, progress: progress)
         case let ext: throw ConversionError.unsupportedOutput(ext)
         }
     }

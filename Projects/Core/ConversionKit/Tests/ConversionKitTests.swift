@@ -37,9 +37,15 @@ import Testing
         }
     }
 
-    @Test func videosBecomeMP4OrTheirSound() {
-        #expect(Formats.outputs(for: URL(filePath: "/tmp/clip.MOV")).map(\.ext) == ["mp4", "m4a", "mp3"])
-        #expect(Formats.outputs(for: URL(filePath: "/tmp/clip.mp4")).map(\.ext) == ["mov", "m4a", "mp3"])
+    @Test func hwpBecomesPDFOrWord() {
+        for ext in ["hwp", "hwpx"] {
+            #expect(Formats.outputs(for: URL(filePath: "/tmp/report.\(ext)")).map(\.ext) == ["pdf", "docx"])
+        }
+    }
+
+    @Test func videosBecomeMP4TheirSoundOrGIF() {
+        #expect(Formats.outputs(for: URL(filePath: "/tmp/clip.MOV")).map(\.ext) == ["mp4", "m4a", "mp3", "gif"])
+        #expect(Formats.outputs(for: URL(filePath: "/tmp/clip.mp4")).map(\.ext) == ["mov", "m4a", "mp3", "gif"])
     }
 
     @Test func soundsRecommendMP3UnlessAlreadyMP3() {

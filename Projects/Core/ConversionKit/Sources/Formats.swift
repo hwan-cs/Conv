@@ -35,6 +35,12 @@ public enum Formats {
                 Output(ext: "docx", caption: "Word에서 고쳐 쓰기"),
             ]
         }
+        if ext == "hwp" || ext == "hwpx" {
+            return [
+                Output(ext: "pdf", caption: "추천 · 인쇄·공유용, 그대로 보여요"),
+                Output(ext: "docx", caption: "Word에서 고쳐 쓰기"),
+            ]
+        }
         if documentInputs.contains(ext) {
             return [Output(ext: "pdf", caption: "인쇄·공유용, 그대로 보여요")]
         }
@@ -45,8 +51,11 @@ public enum Formats {
             ]
         }
         if videoInputs.contains(ext) {
-            let order = ext == "mp4" ? ["mov", "m4a", "mp3"] : ["mp4", "mov", "m4a", "mp3"]
-            return outputs(order.filter { $0 != ext })
+            let order = ext == "mp4" ? ["mov", "m4a", "mp3", "gif"] : ["mp4", "mov", "m4a", "mp3", "gif"]
+            return outputs(order.filter { $0 != ext }).map { output in
+                guard output.ext == "gif" else { return output }
+                return Output(ext: "gif", caption: "움직이는 이미지로, 소리 없이", isPrimary: output.isPrimary)
+            }
         }
         if audioInputs.contains(ext) {
             return outputs(["mp3", "m4a", "wav", "aiff"].filter { $0 != ext })
