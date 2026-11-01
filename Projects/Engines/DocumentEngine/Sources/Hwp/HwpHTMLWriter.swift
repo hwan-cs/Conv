@@ -21,9 +21,7 @@ struct HwpHTMLWriter {
     }
     /// The current paragraph's line gap: Hangul adds it below a line that holds an object, as below text.
     private var objectGap = 0
-    /// Numbering counters by numbering id, one per level.
-    private var counters: [Int: [Int]] = [:]
-    private var outlineNumberingID = 0
+    private var headings: HwpHeadings
     private var defaultTab = 4000
     /// Set while drawing headers and footers, for their page-number fields.
     private var pageNumber: Int?
@@ -34,11 +32,12 @@ struct HwpHTMLWriter {
 
     init(document: HwpDocument) {
         self.document = document
+        headings = HwpHeadings(document: document)
     }
 
     mutating func sections() -> [Output] {
         document.sections.enumerated().map { index, section in
-            outlineNumberingID = section.outlineNumberingID
+            headings.outlineNumberingID = section.outlineNumberingID
             defaultTab = section.defaultTab
             let page = section.page
             let setup = PagedPDFRenderer.PageSetup(
@@ -687,30 +686,7 @@ struct HwpHTMLWriter {
 
     /// - Parameter advance: Whether to count this paragraph; off for later pieces of a split one.
     private mutating func head(_ shape: HwpDocument.ParaShape, charShapeID: Int, advance: Bool = true) -> Head {
-        let none = Head()
-        guard let heading = shape.heading else { return none }
-        let label: String
-        let spacing: HwpDocument.HeadSpacing
-        switch heading.kind {
-        case .bullet:
-            guard let bullet = document.bullets[safe: heading.id - 1] else { return none }
-            label = Self.bulletCharacter(bullet.character)
-            spacing = bullet.spacing
-        case .numbering, .outline:
-            let id = heading.kind == .outline ? outlineNumberingID : heading.id
-            guard let numbering = document.numberings[safe: id - 1], numbering.levels.indices.contains(heading.level) else { return none }
-            var values = counters[id] ?? numbering.levels.map { $0.start - 1 }
-            values[heading.level] += 1
-            for deeper in values.indices where deeper > heading.level { values[deeper] = numbering.levels[deeper].start - 1 }
-            if advance { counters[id] = values } else { values = counters[id] ?? values }
-            // ^1…^7 name levels; ^N is the paragraph's own level, which Hangul shows followed by a period.
-            var text = numbering.levels[heading.level].format.replacingOccurrences(of: "^N", with: "^\(heading.level + 1).")
-            for level in (0..<numbering.levels.count).reversed() {
-                text = text.replacingOccurrences(of: "^\(level + 1)", with: Self.format(max(values[level], numbering.levels[level].start), style: numbering.levels[level].style))
-            }
-            label = text
-            spacing = numbering.levels[heading.level].spacing
-        }
+        guard let (label, spacing) = headings.head(shape.heading, advance: advance) else { return Head() }
         let shapeID = spacing.charShapeID.flatMap { document.charShapes.indices.contains($0) ? $0 : nil } ?? charShapeID
         let size = document.charShapes[safe: shapeID].map { Double($0.height) / 100 } ?? 10
         let gap = spacing.distanceIsPercent ? Double(spacing.distance) / 100 * size : pt(spacing.distance)

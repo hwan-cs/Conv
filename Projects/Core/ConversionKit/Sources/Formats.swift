@@ -29,6 +29,12 @@ public enum Formats {
     /// The best choice first: it is the recommended key.
     public static func outputs(for input: URL) -> [Output] {
         let ext = normalized(input.pathExtension)
+        if ext == "hwp" || ext == "hwpx" {
+            return [
+                Output(ext: "pdf", caption: "추천 · 인쇄·공유용, 그대로 보여요"),
+                Output(ext: "docx", caption: "Word에서 고쳐 쓰기"),
+            ]
+        }
         if documentInputs.contains(ext) {
             return [Output(ext: "pdf", caption: "인쇄·공유용, 그대로 보여요")]
         }

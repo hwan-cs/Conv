@@ -275,6 +275,7 @@ struct HwpSampleTests {
                     try html.write(to: output.appending(path: "\(name)-\(index).html"), atomically: true, encoding: .utf8)
                 }
                 try await HwpPDFConverter().convert(sample, to: output.appending(path: "\(name).pdf"))
+                try HwpDocxConverter().convert(sample, to: output.appending(path: "\(name).docx"))
                 print("SAMPLE \(name): ok in \(ContinuousClock.now - started)")
             } catch {
                 Issue.record("\(name): \(error)")
@@ -370,6 +371,78 @@ extension HwpEquationTests {
         guard let destination = CGImageDestinationCreateWithData(output, "public.png" as CFString, 1, nil) else { return nil }
         CGImageDestinationAddImage(destination, image, nil)
         return CGImageDestinationFinalize(destination) ? output as Data : nil
+    }
+}
+
+@Suite struct HwpDocxWriterTests {
+    /// A section with a heading-sized line of text, a 1×2 table and a footnote.
+    private func document() -> HwpDocument {
+        var document = HwpDocument()
+        document.fonts = Array(repeating: [HwpDocument.Font(name: "함초롬바탕")], count: 7)
+        let plain = HwpDocument.CharShape(
+            faces: Array(repeating: 0, count: 7), ratios: Array(repeating: 100, count: 7), spacings: Array(repeating: 0, count: 7),
+            relativeSizes: Array(repeating: 100, count: 7), offsets: Array(repeating: 0, count: 7), height: 1000, color: .black
+        )
+        var bold = plain
+        bold.bold = true
+        bold.height = 1600
+        document.charShapes = [plain, bold]
+        document.paraShapes = [HwpDocument.ParaShape()]
+        var table = HwpDocument.Table()
+        table.rows = 1
+        table.columns = 2
+        for column in 0..<2 {
+            var cell = HwpDocument.Table.Cell()
+            cell.column = column
+            cell.width = 20000
+            cell.paragraphs = [HwpDocument.Paragraph(content: [.text("칸 \(column + 1)", charShapeID: 0)])]
+            table.cells.append(cell)
+        }
+        let note = [HwpDocument.Paragraph(content: [.text("각주 내용 & 출처", charShapeID: 0)])]
+        var section = HwpDocument.Section()
+        section.paragraphs = [
+            HwpDocument.Paragraph(content: [.text("보고서 <제목>", charShapeID: 1)]),
+            HwpDocument.Paragraph(content: [.text("본문", charShapeID: 0), .control(.footnote(note)), .control(.table(table))]),
+        ]
+        document.sections = [section]
+        return document
+    }
+
+    private func part(_ name: String, of docx: URL) throws -> String {
+        let unzip = Process()
+        unzip.executableURL = URL(filePath: "/usr/bin/unzip")
+        unzip.arguments = ["-p", docx.path, name]
+        let pipe = Pipe()
+        unzip.standardOutput = pipe
+        try unzip.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        unzip.waitUntilExit()
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    @Test func writesTextTablesAndNotesAsWordParts() throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).docx")
+        defer { try? FileManager.default.removeItem(at: url) }
+        var writer = HwpDocxWriter(document: document())
+        try writer.write(to: url)
+
+        let body = try part("word/document.xml", of: url)
+        #expect(body.contains("보고서 &lt;제목&gt;"))
+        #expect(body.contains("<w:b/>") && body.contains("<w:sz w:val=\"32\"/>"))
+        #expect(body.contains("<w:gridCol w:w=\"4000\"/>") && body.contains("칸 2"))
+        #expect(body.contains("<w:footnoteReference w:id=\"1\"/>"))
+        // A4 portrait in twips, the body's sectPr last.
+        #expect(body.contains("<w:pgSz w:w=\"11905\" w:h=\"16837\"/>"))
+        #expect(try part("word/footnotes.xml", of: url).contains("각주 내용 &amp; 출처"))
+        // unzip reads brackets as a pattern.
+        #expect(try part("\\[Content_Types].xml", of: url).contains("footnotes+xml"))
+        #expect(try XMLDocument(xmlString: body, options: []).rootElement() != nil)
+    }
+
+    @Test func equationsBecomeOfficeMath() throws {
+        let omml = HwpOfficeMath.omml(HwpEquation.mathML("{a} over {b} + sqrt {x}"), size: 1000)
+        #expect(omml.hasPrefix("<m:oMath>"))
+        #expect(omml.contains("<m:f>") && omml.contains("<m:rad>"))
     }
 }
 

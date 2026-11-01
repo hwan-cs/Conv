@@ -76,6 +76,8 @@ extension ConversionServiceImpl {
                     try await DocxPDFConverter().convert(source, to: output)
                 case ("hwp", "pdf"), ("hwpx", "pdf"):
                     try await HwpPDFConverter().convert(source, to: output)
+                case ("hwp", "docx"), ("hwpx", "docx"):
+                    try HwpDocxConverter().convert(source, to: output)
                 default:
                     return reply(nil, "\(ext.uppercased()) → \(format.uppercased()) 변환은 아직 못 해요")
                 }

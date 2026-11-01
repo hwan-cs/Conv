@@ -59,14 +59,18 @@ public struct HwpPDFConverter {
         return writer.sections().map(\.html)
     }
 
-    /// .hwpx (ZIP) or .hwp (compound file), told apart by content: Hangul also saves .hwpx under a .hwp name.
     private static func writer(for input: URL) throws -> HwpHTMLWriter {
+        HwpHTMLWriter(document: try document(at: input))
+    }
+
+    /// .hwpx (ZIP) or .hwp (compound file), told apart by content: Hangul also saves .hwpx under a .hwp name.
+    nonisolated static func document(at input: URL) throws -> HwpDocument {
         do {
             if HwpxReader.isPackage(input) {
                 var reader = try HwpxReader(url: input)
-                return HwpHTMLWriter(document: try reader.read())
+                return try reader.read()
             }
-            return HwpHTMLWriter(document: try HwpBinaryReader(file: HwpFile(url: input)).read())
+            return try HwpBinaryReader(file: HwpFile(url: input)).read()
         } catch HwpFile.HwpError.passwordProtected {
             throw ConversionError.passwordProtected
         } catch HwpFile.HwpError.unsupportedVersion(let version) {

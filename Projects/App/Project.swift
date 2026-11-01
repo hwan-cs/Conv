@@ -37,6 +37,7 @@ let documentTypes: Plist.Value = [
             "com.adobe.pdf", "public.jpeg", "public.png", "public.heic", "public.tiff", "com.compuserve.gif",
             "com.microsoft.bmp", "public.avif", "public.mpeg-4", "com.apple.quicktime-movie",
             "com.apple.m4a-audio", "public.mp3", "com.microsoft.waveform-audio", "public.aiff-audio", "public.html",
+            "org.openxmlformats.wordprocessingml.document",
         ],
         "NSIsRelatedItemType": true,
     ],
