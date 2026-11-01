@@ -16,11 +16,12 @@ final class FinderSync: FIFinderSync {
         let menu = NSMenu(title: "")
         guard menuKind == .contextualMenuForItems, let files = selectedFiles(), !files.isEmpty else { return menu }
 
-        let outputs = Self.outputs(for: files)
+        let outputs = Formats.outputs(for: files)
         guard !outputs.isEmpty else { return menu }
         let submenu = NSMenu(title: "conv.로 바꾸기")
         for (index, output) in outputs.enumerated() {
-            let title = ".\(output.ext.uppercased())" + (index == 0 ? "  (추천)" : "")
+            let name = output.combines ? "\(output.ext.uppercased()) 하나로 합치기" : ".\(output.ext.uppercased())"
+            let title = name + (index == 0 ? "  (추천)" : "")
             let item = NSMenuItem(title: title, action: #selector(convert(_:)), keyEquivalent: "")
             item.target = self
             // Finder copies the menu, so the format travels in the tag, not the item itself.
@@ -55,13 +56,6 @@ final class FinderSync: FIFinderSync {
     /// Every output any input can have, for numbering menu items.
     private static let formats = ["jpg", "png", "pdf", "heic", "tiff", "gif", "bmp", "avif", "mp4", "mov", "m4a", "mp3", "wav", "aiff", "html", "docx"]
 
-    /// Formats every selected file can become, best first.
-    private static func outputs(for files: [URL]) -> [Formats.Output] {
-        guard let first = files.first else { return [] }
-        return Formats.outputs(for: first).filter { output in
-            files.allSatisfy { Formats.outputs(for: $0).contains(output) }
-        }
-    }
 
     private static func send(_ files: [URL], format: String?) {
         guard let message = FinderRequest(paths: files.map(\.path), format: format).encoded else { return }

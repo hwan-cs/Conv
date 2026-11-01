@@ -2,6 +2,7 @@ import ConversionKit
 import DocumentEngine
 import ImageEngine
 import MediaEngine
+import PDFEngine
 import Foundation
 
 final class ConversionServiceImpl: NSObject, ConversionServiceProtocol, @unchecked Sendable {
@@ -93,6 +94,75 @@ extension ConversionServiceImpl {
         }
     }
 
+    func combine(
+        _ inputs: [FileHandle],
+        named names: [String],
+        to format: String,
+        job: String,
+        withReply reply: @escaping @Sendable (FileHandle?, String?) -> Void
+    ) {
+        let progress = reporter(for: job)
+        Task { @MainActor in
+            let work = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+            defer { try? FileManager.default.removeItem(at: work) }
+            do {
+                guard format == "pdf", inputs.count == names.count else {
+                    return reply(nil, "\(format.uppercased())로는 합칠 수 없어요")
+                }
+                try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+                var pdfs: [URL] = []
+                for (index, (handle, name)) in zip(inputs, names).enumerated() {
+                    let ext = (name as NSString).pathExtension.lowercased()
+                    let source = work.appending(path: "input-\(index).\(ext)")
+                    try Self.copy(handle, to: source)
+                    try? handle.close()
+                    switch ext {
+                    case "pdf":
+                        pdfs.append(source)
+                    case _ where Formats.imageInputs.contains(ext):
+                        // An image becomes its own pages first, as it does alone.
+                        let pdf = work.appending(path: "input-\(index).pdf")
+                        try ImageConverter().convert(source, to: pdf)
+                        pdfs.append(pdf)
+                    default:
+                        return reply(nil, "\(ext.uppercased()) 파일은 PDF에 합칠 수 없어요")
+                    }
+                    progress(Double(index + 1) / Double(names.count) * 0.5)
+                }
+                let output = work.appending(path: "output.pdf")
+                try PDFCombiner().combine(pdfs, to: output) { progress(0.5 + $0 * 0.5) }
+                reply(try FileHandle(forReadingFrom: output), nil)
+            } catch {
+                reply(nil, Self.message(for: error))
+            }
+        }
+    }
+
+    func convertPages(
+        _ input: FileHandle,
+        named name: String,
+        to format: String,
+        job: String,
+        withReply reply: @escaping @Sendable (FileHandle?, String?) -> Void
+    ) {
+        let progress = reporter(for: job)
+        Task { @MainActor in
+            let work = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+            defer { try? FileManager.default.removeItem(at: work) }
+            do {
+                try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+                let source = work.appending(path: "input.pdf")
+                try Self.copy(input, to: source)
+                try? input.close()
+                let output = work.appending(path: "pages")
+                try PDFPageRenderer().render(source, as: format, to: output, progress: progress)
+                reply(try FileHandle(forReadingFrom: output), nil)
+            } catch {
+                reply(nil, Self.message(for: error))
+            }
+        }
+    }
+
     /// Streams a handle into a file, a few megabytes at a time.
     private static func copy(_ handle: FileHandle, to url: URL) throws {
         FileManager.default.createFile(atPath: url.path, contents: nil)
@@ -108,6 +178,9 @@ extension ConversionServiceImpl {
         case HwpPDFConverter.ConversionError.passwordProtected: "암호가 걸린 HWP는 바꿀 수 없어요"
         case HwpPDFConverter.ConversionError.unsupportedVersion(let version): "HWP \(version) 형식은 아직 못 읽어요"
         case HwpPDFConverter.ConversionError.unreadableDocument: "HWP 파일이 아니거나 손상됐어요"
+        case PDFEngine.ConversionError.passwordProtected: "암호가 걸린 PDF는 바꿀 수 없어요"
+        case PDFEngine.ConversionError.unreadable: "PDF 파일이 아니거나 손상됐어요"
+        case PDFEngine.ConversionError.unsupportedOutput(let ext): "PDF를 \(ext.uppercased())로는 아직 못 바꿔요"
         case ImageConverter.ConversionError.unreadable: "이미지를 읽을 수 없어요"
         case ImageConverter.ConversionError.unsupportedOutput(let ext): "\(ext.uppercased())로는 아직 저장할 수 없어요"
         case MediaConverter.ConversionError.unreadable: "영상이나 소리를 읽을 수 없어요"
@@ -120,7 +193,7 @@ extension ConversionServiceImpl {
 
 final class ServiceDelegate: NSObject, NSXPCListenerDelegate {
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
-        newConnection.exportedInterface = NSXPCInterface(with: ConversionServiceProtocol.self)
+        newConnection.exportedInterface = ConversionService.interface()
         newConnection.remoteObjectInterface = NSXPCInterface(with: ConversionProgressProtocol.self)
         newConnection.exportedObject = ConversionServiceImpl(connection: newConnection)
         newConnection.resume()

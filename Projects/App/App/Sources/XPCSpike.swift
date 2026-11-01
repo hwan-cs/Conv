@@ -42,8 +42,14 @@ enum XPCSpike {
     }
 
     /// `Conv --spike-convert`: converts every file in the app's `conv-spike/in` directory to its
-    /// recommended format through the service and writes each beside its original, logging to `convert.log`.
+    /// recommended format (or `--spike-format`) through the service and writes each beside its original, then combines
+    /// its images and PDFs into one, logging to `convert.log`.
     static var isConvertRequested: Bool { CommandLine.arguments.contains("--spike-convert") }
+
+    /// `--spike-format gif`: that format instead, for the files that can become it.
+    private static var requestedFormat: String? {
+        CommandLine.arguments.firstIndex(of: "--spike-format").flatMap { CommandLine.arguments.dropFirst($0 + 1).first }
+    }
 
     @MainActor
     static func runConvert() {
@@ -56,14 +62,31 @@ enum XPCSpike {
             for file in files where !Formats.outputs(for: file).isEmpty {
                 let started = Date()
                 do {
-                    let format = Formats.outputs(for: file).first?.ext ?? "pdf"
+                    let format = Formats.outputs(for: file).first { $0.ext == requestedFormat }?.ext ?? Formats.outputs(for: file).first?.ext ?? "pdf"
                     let reports = ProgressLog()
-                    let converted = try await client.convert(file, to: format) { reports.add($0) }
-                    let written = try SiblingWriter.copy(converted, nextTo: file, extension: format)
+                    let written: URL
+                    if Formats.splitsPages(file) {
+                        let pages = try await client.convertPages(file, to: format) { reports.add($0) }
+                        written = try SiblingWriter.writePages(pages, nextTo: file, extension: format, keepingBoth: true)
+                    } else {
+                        let converted = try await client.convert(file, to: format) { reports.add($0) }
+                        written = try SiblingWriter.copyKeepingBoth(converted, nextTo: file, extension: format)
+                    }
                     let size = (try? written.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
                     lines.append("ok \(file.lastPathComponent) → \(written.lastPathComponent) \(size) bytes in \(String(format: "%.2f", Date().timeIntervalSince(started)))s, \(reports.summary)")
                 } catch {
                     lines.append("fail \(file.lastPathComponent): \(error)")
+                }
+            }
+            // Then the images and PDFs there, all in one PDF.
+            let combinable = files.filter { Formats.outputs(for: [$0, $0]).contains(where: \.combines) }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+            if combinable.count > 1 {
+                do {
+                    let combined = try await client.combine(combinable, to: "pdf")
+                    let written = try SiblingWriter.copyCombined(combined, of: combinable, extension: "pdf", keepingBoth: true)
+                    lines.append("ok \(combinable.count) files → \(written.lastPathComponent)")
+                } catch {
+                    lines.append("fail combining: \(error)")
                 }
             }
             try? Data(lines.joined(separator: "\n").utf8).write(to: log)

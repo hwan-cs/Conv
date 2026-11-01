@@ -11,7 +11,7 @@ public final class ConversionClient: @unchecked Sendable {
 
     public init() {
         connection = NSXPCConnection(serviceName: ConversionService.serviceName)
-        connection.remoteObjectInterface = NSXPCInterface(with: ConversionServiceProtocol.self)
+        connection.remoteObjectInterface = ConversionService.interface()
         connection.exportedInterface = NSXPCInterface(with: ConversionProgressProtocol.self)
         connection.exportedObject = progress
         connection.resume()
@@ -31,6 +31,69 @@ public final class ConversionClient: @unchecked Sendable {
     ) async throws -> FileHandle {
         let handle = try FileHandle(forReadingFrom: input)
         defer { try? handle.close() }
+        return try await call(onProgress) { service, job, reply in
+            service.convert(handle, named: input.lastPathComponent, to: format, job: job, withReply: reply)
+        }
+    }
+
+    /// Each page of the PDF at `input` as an image of `format`.
+    public func convertPages(
+        _ input: URL,
+        to format: String,
+        onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> PackedFiles.Reader {
+        let handle = try FileHandle(forReadingFrom: input)
+        defer { try? handle.close() }
+        let packed = try await call(onProgress) { service, job, reply in
+            service.convertPages(handle, named: input.lastPathComponent, to: format, job: job, withReply: reply)
+        }
+        return try PackedFiles.Reader(packed)
+    }
+
+    /// The files at `inputs` made into one `format` file, in order. More than the service takes in
+    /// one message are combined in parts, and the parts combined again.
+    public func combine(
+        _ inputs: [URL],
+        to format: String,
+        onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> FileHandle {
+        let limit = ConversionService.combineLimit
+        let chunks = stride(from: 0, to: inputs.count, by: limit).map { Array(inputs[$0..<min($0 + limit, inputs.count)]) }
+        var parts: [FileHandle] = []
+        for (index, chunk) in chunks.enumerated() {
+            let handles = try chunk.map { try FileHandle(forReadingFrom: $0) }
+            defer { for handle in handles { try? handle.close() } }
+            let part = try await combine(handles, named: chunk.map(\.lastPathComponent), to: format) { fraction in
+                onProgress((Double(index) + fraction) / Double(chunks.count))
+            }
+            parts.append(part)
+        }
+        while parts.count > 1 {
+            let next = parts.prefix(limit)
+            let part = try await combine(Array(next), named: next.map { _ in "part.\(format)" }, to: format)
+            for handle in next { try? handle.close() }
+            parts = [part] + parts.dropFirst(next.count)
+        }
+        guard let combined = parts.first else { throw Failure(description: "합칠 파일이 없어요") }
+        return combined
+    }
+
+    private func combine(
+        _ handles: [FileHandle],
+        named names: [String],
+        to format: String,
+        onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> FileHandle {
+        try await call(onProgress) { service, job, reply in
+            service.combine(handles, named: names, to: format, job: job, withReply: reply)
+        }
+    }
+
+    /// Sends one request, with progress routed to `onProgress`, and waits for its reply.
+    private func call(
+        _ onProgress: @escaping @Sendable (Double) -> Void,
+        _ send: (ConversionServiceProtocol, String, @escaping @Sendable (FileHandle?, String?) -> Void) -> Void
+    ) async throws -> FileHandle {
         let job = UUID().uuidString
         progress.register(job, onProgress)
         defer { progress.unregister(job) }
@@ -44,7 +107,7 @@ public final class ConversionClient: @unchecked Sendable {
                 if resumed.claim() { continuation.resume(throwing: Failure(description: "변환 서비스에 연결할 수 없어요")) }
                 return
             }
-            service.convert(handle, named: input.lastPathComponent, to: format, job: job) { output, error in
+            send(service, job) { output, error in
                 guard resumed.claim() else { return }
                 if let output {
                     continuation.resume(returning: output)

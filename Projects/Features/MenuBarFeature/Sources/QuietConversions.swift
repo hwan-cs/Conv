@@ -21,10 +21,13 @@ public final class QuietConversions: NSObject {
     public private(set) var current: Job?
     public private(set) var fileIndex = 0
     public private(set) var fileProgress: Double = 0
+    private var isCombining = false
 
     /// 0…1 over the whole batch in progress.
     public var progress: Double {
         guard let current else { return 0 }
+        // Files combined into one move together.
+        if isCombining { return fileProgress }
         return (Double(fileIndex) + fileProgress) / Double(max(current.files.count, 1))
     }
 
@@ -56,13 +59,28 @@ public final class QuietConversions: NSObject {
             current = job
             var written: [URL] = []
             var failures: [(URL, String)] = []
+            if Formats.outputs(for: job.files).first(where: { $0.ext == job.format })?.combines == true {
+                isCombining = true
+                fileProgress = 0
+                defer { isCombining = false }
+                switch await combine(job.files, to: job.format) {
+                case .success(let output):
+                    written.append(output)
+                    ConversionHistory.shared.record(input: job.files[0], output: output)
+                case .failure(let reason):
+                    failures = job.files.map { ($0, reason.text) }
+                }
+                current = nil
+                notify(job: job, written: written, failures: failures, combined: true)
+                continue
+            }
             for (index, file) in job.files.enumerated() {
                 fileIndex = index
                 fileProgress = 0
                 switch await convert(file, to: job.format) {
                 case .success(let output):
                     written.append(output)
-                    ConversionHistory.shared.record(input: file, output: output)
+                    ConversionHistory.shared.record(input: file, output: output, format: job.format)
                 case .failure(let reason):
                     failures.append((file, reason.text))
                 }
@@ -72,7 +90,45 @@ public final class QuietConversions: NSObject {
         }
     }
 
+    private func combine(_ files: [URL], to format: String) async -> Result<URL, Reason> {
+        let combined: FileHandle
+        do {
+            combined = try await client.combine(files, to: format) { fraction in
+                Task { @MainActor [weak self] in self?.fileProgress = fraction }
+            }
+        } catch let error as ConversionClient.Failure {
+            return .failure(Reason(error.description))
+        } catch {
+            return .failure(Reason("파일을 읽을 수 없어요"))
+        }
+        defer { try? combined.close() }
+        do {
+            return .success(try SiblingWriter.copyCombined(combined, of: files, extension: format, keepingBoth: true))
+        } catch {
+            return .failure(Reason("저장하지 못했어요"))
+        }
+    }
+
+    private func convertPages(_ file: URL, to format: String) async -> Result<URL, Reason> {
+        let pages: PackedFiles.Reader
+        do {
+            pages = try await client.convertPages(file, to: format) { fraction in
+                Task { @MainActor [weak self] in self?.fileProgress = fraction }
+            }
+        } catch let error as ConversionClient.Failure {
+            return .failure(Reason(error.description))
+        } catch {
+            return .failure(Reason("파일을 읽을 수 없어요"))
+        }
+        do {
+            return .success(try SiblingWriter.writePages(pages, nextTo: file, extension: format, keepingBoth: true))
+        } catch {
+            return .failure(Reason("저장하지 못했어요"))
+        }
+    }
+
     private func convert(_ file: URL, to format: String) async -> Result<URL, Reason> {
+        if Formats.splitsPages(file) { return await convertPages(file, to: format) }
         let converted: FileHandle
         do {
             converted = try await client.convert(file, to: format) { fraction in
@@ -91,10 +147,13 @@ public final class QuietConversions: NSObject {
         }
     }
 
-    private func notify(job: Job, written: [URL], failures: [(URL, String)]) {
+    private func notify(job: Job, written: [URL], failures: [(URL, String)], combined: Bool = false) {
         let content = UNMutableNotificationContent()
         let format = job.format.uppercased()
-        if failures.isEmpty {
+        if combined {
+            content.title = written.isEmpty ? "합치지 못했어요" : "\(job.files.count)개를 \(format) 하나로 합쳤어요"
+            content.body = written.first?.lastPathComponent ?? failures.first?.1 ?? ""
+        } else if failures.isEmpty {
             content.title = written.count == 1 ? "\(format)로 바꿨어요" : "\(written.count)개를 \(format)로 바꿨어요"
             content.body = written.count == 1 ? written[0].lastPathComponent : written.map(\.lastPathComponent).joined(separator: ", ")
         } else if written.isEmpty {

@@ -1,3 +1,4 @@
+import ConversionKit
 import Foundation
 import Testing
 @testable import Platform
@@ -74,5 +75,57 @@ import Testing
         let pdf = URL(filePath: "/Users/me/보고서.pdf")
         #expect(SiblingWriter.numbered(pdf, 1) == pdf)
         #expect(SiblingWriter.numbered(pdf, 2).path == "/Users/me/보고서 2.pdf")
+    }
+}
+
+@Suite struct SiblingWriterManyTests {
+    let directory: URL
+
+    init() throws {
+        directory = FileManager.default.temporaryDirectory.appending(path: "sibling-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    private func pages(_ count: Int) throws -> PackedFiles.Reader {
+        let url = directory.appending(path: "packed-\(UUID().uuidString)")
+        let writer = try PackedFiles.Writer(url: url, count: count)
+        for index in 0..<count { try writer.append(Data("page \(index)".utf8)) }
+        try writer.finish()
+        return try PackedFiles.Reader(FileHandle(forReadingFrom: url))
+    }
+
+    @Test func pagesGoInAFolderNamedAfterThePDF() throws {
+        let pdf = directory.appending(path: "v1.2 보고서.pdf")
+        let folder = try SiblingWriter.writePages(pages(12), nextTo: pdf, extension: "jpg", keepingBoth: true)
+        #expect(folder.lastPathComponent == "v1.2 보고서")
+        let names = try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted()
+        #expect(names.first == "v1.2 보고서-01.jpg" && names.last == "v1.2 보고서-12.jpg" && names.count == 12)
+        // Again: a second folder rather than mixing pages.
+        let again = try SiblingWriter.writePages(pages(2), nextTo: pdf, extension: "jpg", keepingBoth: true)
+        #expect(again.lastPathComponent == "v1.2 보고서 2")
+        #expect(throws: SiblingWriter.WriteError.self) {
+            try SiblingWriter.writePages(pages(2), nextTo: pdf, extension: "jpg", keepingBoth: false)
+        }
+    }
+
+    @Test func aSinglePageSitsBesideThePDF() throws {
+        let pdf = directory.appending(path: "poster.pdf")
+        try Data().write(to: pdf)
+        let image = try SiblingWriter.writePages(pages(1), nextTo: pdf, extension: "png", keepingBoth: true)
+        #expect(image.lastPathComponent == "poster.png")
+        #expect(try Data(contentsOf: image) == Data("page 0".utf8))
+    }
+
+    @Test func combinedFilesAreNamedAfterTheFirst() throws {
+        let files = ["IMG_1.jpg", "IMG_2.jpg", "IMG_3.jpg"].map { directory.appending(path: $0) }
+        #expect(SiblingWriter.combinedName(of: files, extension: "pdf").lastPathComponent == "IMG_1 외 2개.pdf")
+        let source = directory.appending(path: "source.pdf")
+        try Data("pdf".utf8).write(to: source)
+        let handle = try FileHandle(forReadingFrom: source)
+        let first = try SiblingWriter.copyCombined(handle, of: files, extension: "pdf", keepingBoth: true)
+        let second = try SiblingWriter.copyCombined(handle, of: files, extension: "pdf", keepingBoth: true)
+        #expect(first.lastPathComponent == "IMG_1 외 2개.pdf")
+        #expect(second.lastPathComponent == "IMG_1 외 2개 2.pdf")
+        #expect(try Data(contentsOf: second) == Data("pdf".utf8))
     }
 }

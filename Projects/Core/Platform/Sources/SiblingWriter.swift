@@ -53,7 +53,7 @@ public enum SiblingWriter {
         try copy(handle, to: url, overwriting: true)
     }
 
-    private static func copy(_ handle: FileHandle, to url: URL, overwriting: Bool) throws {
+    static func copy(_ handle: FileHandle, to url: URL, overwriting: Bool) throws {
         if !overwriting, FileManager.default.fileExists(atPath: url.path) {
             throw CocoaError(.fileWriteFileExists)
         }
@@ -70,7 +70,7 @@ public enum SiblingWriter {
         try write(to: sibling(of: original, extension: ext), primary: original, body)
     }
 
-    private static func write(to target: URL, primary original: URL, _ body: (URL) throws -> Void) throws -> URL {
+    static func write(to target: URL, primary original: URL, _ body: (URL) throws -> Void) throws -> URL {
         let presenter = RelatedItemPresenter(primary: original, item: target)
         NSFileCoordinator.addFilePresenter(presenter)
         defer { NSFileCoordinator.removeFilePresenter(presenter) }

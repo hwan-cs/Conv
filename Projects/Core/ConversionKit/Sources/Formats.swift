@@ -10,12 +10,15 @@ public enum Formats {
         public let caption: String
         /// Shown as a key on the pick screen; the rest wait behind "더 보기".
         public let isPrimary: Bool
-        public var id: String { ext }
+        /// All the files become one: images and PDFs into a single PDF.
+        public let combines: Bool
+        public var id: String { combines ? "\(ext)+" : ext }
 
-        public init(ext: String, caption: String, isPrimary: Bool = true) {
+        public init(ext: String, caption: String, isPrimary: Bool = true, combines: Bool = false) {
             self.ext = ext
             self.caption = caption
             self.isPrimary = isPrimary
+            self.combines = combines
         }
     }
 
@@ -25,6 +28,31 @@ public enum Formats {
     public static let videoInputs: Set<String> = ["mov", "mp4", "m4v"]
     public static let audioInputs: Set<String> = ["m4a", "mp3", "wav", "aiff", "aif", "caf", "aac", "flac"]
     public static var mediaInputs: Set<String> { videoInputs.union(audioInputs) }
+    public static let pdfInputs: Set<String> = ["pdf"]
+
+    /// Formats every one of the files can become, best first. Several images or PDFs can also
+    /// become one PDF together.
+    public static func outputs(for files: [URL]) -> [Output] {
+        guard let first = files.first else { return [] }
+        // By format alone: PNG is recommended for a JPG but not for a HEIC, and both can become it.
+        var common = outputs(for: first).filter { output in
+            files.allSatisfy { outputs(for: $0).contains { $0.ext == output.ext } }
+        }
+        let combinable = files.allSatisfy { imageInputs.contains(normalized($0.pathExtension)) || pdfInputs.contains(normalized($0.pathExtension)) }
+        guard files.count > 1, combinable else { return common }
+        if let index = common.firstIndex(where: { $0.ext == "pdf" }) {
+            // Photos each made into a PDF are rarely wanted; one PDF of them all is.
+            common[index] = Output(ext: "pdf", caption: "여러 장을 PDF 하나로", isPrimary: common[index].isPrimary, combines: true)
+        } else {
+            common.insert(Output(ext: "pdf", caption: "추천 · PDF 하나로 합치기", combines: true), at: 0)
+        }
+        return common
+    }
+
+    /// A PDF's pages each become an image, so one file comes out as several.
+    public static func splitsPages(_ input: URL) -> Bool {
+        pdfInputs.contains(normalized(input.pathExtension))
+    }
 
     /// The best choice first: it is the recommended key.
     public static func outputs(for input: URL) -> [Output] {
@@ -35,14 +63,14 @@ public enum Formats {
                 Output(ext: "docx", caption: "Word에서 고쳐 쓰기"),
             ]
         }
-        if ext == "hwp" || ext == "hwpx" {
-            return [
-                Output(ext: "pdf", caption: "추천 · 인쇄·공유용, 그대로 보여요"),
-                Output(ext: "docx", caption: "Word에서 고쳐 쓰기"),
-            ]
-        }
         if documentInputs.contains(ext) {
             return [Output(ext: "pdf", caption: "인쇄·공유용, 그대로 보여요")]
+        }
+        if pdfInputs.contains(ext) {
+            return [
+                Output(ext: "jpg", caption: "추천 · 쪽마다 한 장씩"),
+                Output(ext: "png", caption: "쪽마다 한 장씩, 글자가 더 또렷하게"),
+            ]
         }
         if markdownInputs.contains(ext) {
             return [

@@ -286,6 +286,14 @@ private struct ConfirmBar: View {
 
     private var detail: String {
         guard let selected else { return "숫자 키나 클릭으로 고른 뒤, 한 번 더 확인해요." }
+        if selected.combines {
+            let name = SiblingWriter.combinedName(of: model.items.map(\.url), extension: selected.ext).lastPathComponent
+            return "원본은 그대로 두고, 첫 파일 옆에 저장돼요: \(name)"
+        }
+        if model.items.allSatisfy({ Formats.splitsPages($0.url) }) {
+            let folder = model.items.count == 1 ? "'\(model.items[0].url.deletingPathExtension().lastPathComponent)' 폴더" : "PDF마다 폴더"
+            return "쪽마다 한 장씩, 여러 쪽이면 옆의 \(folder)에 담아요."
+        }
         if model.items.count == 1, let first = model.items.first {
             let name = first.url.deletingPathExtension().appendingPathExtension(selected.ext).lastPathComponent
             return "원본은 그대로 두고, 옆에 저장돼요: \(name)"
@@ -443,6 +451,12 @@ private struct ConversionRow: View {
 private struct DoneScreen: View {
     let model: DropModel
 
+    private var headline: String {
+        guard model.finishedCount > 0 else { return "바꾸지 못했어요" }
+        if model.output?.combines == true { return "\(model.items.count)개를 PDF 하나로 합쳤어요" }
+        return "\(model.finishedCount)개 바꿨어요"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top) {
@@ -456,17 +470,24 @@ private struct DoneScreen: View {
                 ConvStamp(subtitle: "\(model.finishedCount) OF \(model.items.count)")
             }
             Spacer()
-            Text(model.finishedCount > 0 ? "\(model.finishedCount)개 바꿨어요" : "바꾸지 못했어요")
+            Text(headline)
                 .font(ConvFont.sans(30, .heavy))
                 .tracking(-1)
                 .foregroundStyle(ConvColor.ink)
             VStack(alignment: .leading, spacing: 4) {
                 if model.finishedCount > 0 {
-                    Text(model.items.contains(where: \.isPasted) ? "고른 곳에 저장했어요." : "원본은 그대로 두고, 바뀐 파일은 원본 옆에 놓았어요.")
+                    Text(model.items.contains(where: \.isPasted) ? "고른 곳에 저장했어요." : model.output?.combines == true ? "원본은 그대로 두고, 합친 파일을 저장했어요." : "원본은 그대로 두고, 바뀐 파일은 원본 옆에 놓았어요.")
                 }
-                ForEach(model.failedItems) { item in
-                    if case .failed(let message) = item.status {
-                        Text("\(item.name): \(message)").foregroundStyle(ConvColor.errorText)
+                if model.output?.combines == true {
+                    // One failure shared by every file.
+                    if case .failed(let message) = model.failedItems.first?.status {
+                        Text(message).foregroundStyle(ConvColor.errorText)
+                    }
+                } else {
+                    ForEach(model.failedItems) { item in
+                        if case .failed(let message) = item.status {
+                            Text("\(item.name): \(message)").foregroundStyle(ConvColor.errorText)
+                        }
                     }
                 }
             }

@@ -31,8 +31,10 @@ public final class ConversionHistory {
         }
     }
 
-    public func record(input: URL, output: URL) {
-        let entry = Entry(inputName: input.lastPathComponent, outputExtension: output.pathExtension.lowercased(), output: output, date: .now)
+    /// - Parameter format: The format made, when `output` doesn't say: a folder of a PDF's pages.
+    public func record(input: URL, output: URL, format: String? = nil) {
+        let ext = format ?? output.pathExtension.lowercased()
+        let entry = Entry(inputName: input.lastPathComponent, outputExtension: ext, output: output, date: .now)
         entries = Array(([entry] + entries).prefix(Self.limit))
         if let data = try? JSONEncoder().encode(entries) { defaults.set(data, forKey: Self.key) }
     }
