@@ -41,7 +41,9 @@ struct DocxHTMLWriter {
 
     /// A complex field: `fldChar begin`, `instrText`, `fldChar separate`, cached result runs, `fldChar end`.
     private struct FieldState {
-        enum Phase { case none, instruction, result }
+        enum Phase {
+            case none, instruction, result
+        }
         var phase = Phase.none
         var instruction = ""
         var token: String?
@@ -53,7 +55,7 @@ struct DocxHTMLWriter {
             throw DocxPackage.PackageError.notADocx
         }
         let sections = sections(of: body)
-        // One print setup serves every section: take the widest column and pad the narrower ones.
+        
         var page = pageSetup(body.child("sectPr"))
         page.margins.left = sections.map { pageSetup($0.properties).margins.left }.min() ?? page.margins.left
         page.margins.right = sections.map { pageSetup($0.properties).margins.right }.min() ?? page.margins.right
@@ -77,7 +79,6 @@ struct DocxHTMLWriter {
             ]
             var attributes = ""
             if columns.count > 1 {
-                // WebKit prints CSS columns as one; `columnScript` lays them out before printing.
                 let height = writer.section.paperSize.height - writer.section.margins.top - writer.section.margins.bottom
                 attributes = #" data-columns="\#(columns.count)" data-gap="\#(decimal(columns.gap))""#
                     + #" data-width="\#(decimal(writer.columnWidth))" data-height="\#(decimal(height))""#
@@ -97,12 +98,15 @@ struct DocxHTMLWriter {
             page: page,
             fontFaces: writer.fonts.css
         )
-        return Output(html: document(writer.html, fontFaces: writer.fonts.css), page: page, headerFooter: headerFooter)
+        return Output(
+            html: document(writer.html, fontFaces: writer.fonts.css),
+            page: page,
+            headerFooter: headerFooter
+        )
     }
 
     /// Each section's headers and footers as HTML. Word inherits a missing reference from the previous section.
     private mutating func headerFooterSections(_ sections: [Section]) -> [DocxHeaderFooter.Section] {
-        // Part paths by type; an inherited part is laid out again in the inheriting section's column.
         var headerPaths: [String: String] = [:]
         var footerPaths: [String: String] = [:]
         var result: [DocxHeaderFooter.Section] = []
@@ -130,11 +134,12 @@ struct DocxHTMLWriter {
         return result
     }
 
-    /// A section's own header or footer part paths by type ("default", "first", "even").
     private func referencedPaths(_ name: String, in properties: XMLElement?) -> [String: String] {
         var result: [String: String] = [:]
         for reference in properties?.children(name) ?? [] {
-            guard let id = reference.value("id", in: OOXMLNamespace.r), let path = package.relationships[id] else { continue }
+            guard let id = reference.value("id", in: OOXMLNamespace.r), let path = package.relationships[id] else {
+                continue
+            }
             result[reference.value("type") ?? "default"] = path
         }
         return result
@@ -142,7 +147,9 @@ struct DocxHTMLWriter {
 
     /// A header or footer part, written with its own relationships and with live page fields.
     private mutating func part(at path: String) -> String {
-        guard let root = try? package.xml(at: path) else { return "" }
+        guard let root = try? package.xml(at: path) else {
+            return ""
+        }
         let savedRelationships = relationships
         relationships = (try? package.relationships(forPart: path)) ?? [:]
         substitutesPageFields = true
@@ -157,7 +164,9 @@ struct DocxHTMLWriter {
     private static func firstText(_ elements: [XMLElement]) -> String? {
         var text = ""
         func collect(_ element: XMLElement) {
-            guard text.count < 12 else { return }
+            guard text.count < 12 else {
+                return
+            }
             if element.localName == "t" {
                 text += (element.stringValue ?? "").replacingOccurrences(of: DocxPackage.blankTextMarker, with: "")
             }
@@ -176,7 +185,9 @@ struct DocxHTMLWriter {
     /// A section's text columns (`w:cols`): how many, the gap between them, and whether a line
     /// separates them. Columns of unequal widths are drawn equal.
     private static func columns(_ sectPr: XMLElement?) -> (count: Int, gap: Double, separator: Bool) {
-        guard let cols = sectPr?.child("cols") else { return (1, 0, false) }
+        guard let cols = sectPr?.child("cols") else {
+            return (1, 0, false)
+        }
         let count = max(Int(cols.number("num") ?? Double(cols.children("col").count)), 1)
         return (count, twips(cols.number("space") ?? 720), cols.value("sep").map { $0 == "1" || $0 == "true" } ?? false)
     }
@@ -244,7 +255,9 @@ struct DocxHTMLWriter {
     /// No text or picture, e.g. a code listing's blank line that holds only a tab. Its height comes
     /// from the paragraph mark, which runs can't provide.
     private static func isBlank(_ html: String) -> Bool {
-        guard !html.contains("<img") else { return false }
+        guard !html.contains("<img") else {
+            return false
+        }
         let text = html.replacing(/<[^>]*>/, with: "")
         return text.allSatisfy { $0.isWhitespace || $0 == "\u{200B}" || isTabMarker($0) }
     }
@@ -255,7 +268,9 @@ struct DocxHTMLWriter {
 
     /// A paragraph's style id, or "" for the default style; nil for non-paragraphs.
     private static func paragraphStyle(_ element: XMLElement) -> String? {
-        guard element.localName == "p" else { return nil }
+        guard element.localName == "p" else {
+            return nil
+        }
         return element.child("pPr")?.child("pStyle")?.value() ?? ""
     }
 
@@ -268,20 +283,22 @@ struct DocxHTMLWriter {
         var label: String?
         var labelRun = RunFormat()
         if let reference = format.numbering, let level = numbering.level(reference) {
-            // A list level's indent sits between the paragraph style and direct formatting.
             format = style.paragraph.overlaid(by: level.paragraph).overlaid(by: direct)
             label = numbering.nextLabel(reference)
             labelRun = level.run
         }
         if format.contextualSpacing == true {
-            if previousStyle == (styleID ?? "") { format.spaceBefore = 0 }
-            if nextStyle == (styleID ?? "") { format.spaceAfter = 0 }
+            if previousStyle == (styleID ?? "") {
+                format.spaceBefore = 0
+            }
+            if nextStyle == (styleID ?? "") {
+                format.spaceAfter = 0
+            }
         }
         let markRun = style.run.overlaid(by: RunFormat(pPr?.child("rPr")))
         paragraphIndent = format.indentLeft ?? 0
         lineSpacing = format.lineSpacing
 
-        // A page break inside a paragraph splits it; the rest starts the next page.
         var chunks = [""]
         inlines(p.elements, base: style.run, into: &chunks)
         var breaksBeforeFirst = format.pageBreakBefore == true
@@ -303,14 +320,11 @@ struct DocxHTMLWriter {
                 let labelCSS = runCSS(markRun.overlaid(by: labelRun)).joined(separator: ";")
                 content = #"<span class="label" style="\#(width)\#(labelCSS)">\#(Self.escape(label))</span>"# + content
             }
-            // A div rather than <p>: a text box's paragraphs sit inside this one, and HTML would
-            // close a <p> at the first nested one.
             html += #"<div class="p" style="\#(css.joined(separator: ";"))">\#(content.isEmpty ? "<br>" : content)</div>"# + "\n"
         }
     }
 
     // MARK: - Inlines
-
     private mutating func inlines(_ elements: [XMLElement], base: RunFormat, into chunks: inout [String]) {
         for element in elements {
             if element.uri == Self.markupCompatibility, element.localName == "AlternateContent" {
@@ -318,7 +332,9 @@ struct DocxHTMLWriter {
                 inlines(choice?.elements ?? [], base: base, into: &chunks)
                 continue
             }
-            guard element.uri == OOXMLNamespace.w else { continue }
+            guard element.uri == OOXMLNamespace.w else {
+                continue
+            }
             switch element.localName {
             case "r": run(element, base: base, into: &chunks)
             case "fldSimple" where substitutesPageFields && Self.pageFieldToken(element.value("instr")) != nil:
@@ -338,7 +354,9 @@ struct DocxHTMLWriter {
             .overlaid(by: RunFormat(rPr))
         var text = ""
         func flush() {
-            guard !text.isEmpty else { return }
+            guard !text.isEmpty else {
+                return
+            }
             chunks[chunks.count - 1] += #"<span style="\#(runCSS(format).joined(separator: ";"))">\#(text)</span>"#
             text = ""
         }
@@ -352,8 +370,12 @@ struct DocxHTMLWriter {
                 }
                 continue
             }
-            guard element.uri == OOXMLNamespace.w else { continue }
-            if substitutesPageFields, handleField(element, into: &text) { continue }
+            guard element.uri == OOXMLNamespace.w else {
+                continue
+            }
+            if substitutesPageFields, handleField(element, into: &text) {
+                continue
+            }
             switch element.localName {
             case "t":
                 let value = (element.stringValue ?? "").replacingOccurrences(of: DocxPackage.blankTextMarker, with: "")
@@ -375,9 +397,12 @@ struct DocxHTMLWriter {
                 } else {
                     text += "<br>"
                 }
-            case "cr": text += "<br>"
-            case "noBreakHyphen": text += "&#8209;"
-            case "softHyphen": text += "&shy;"
+            case "cr": 
+                text += "<br>"
+            case "noBreakHyphen": 
+                text += "&#8209;"
+            case "softHyphen": 
+                text += "&shy;"
             case "sym":
                 if let code = element.value("char").flatMap({ UInt32($0, radix: 16) }) {
                     text += Self.escape(Self.symbol(code))
@@ -388,7 +413,8 @@ struct DocxHTMLWriter {
             case "pict":
                 flush()
                 chunks[chunks.count - 1] += vmlImage(element)
-            default: break
+            default:
+                 break
             }
         }
         flush()
@@ -405,7 +431,9 @@ struct DocxHTMLWriter {
             case "separate":
                 field.phase = .result
                 field.token = Self.pageFieldToken(field.instruction)
-                if let token = field.token { text += token }
+                if let token = field.token {
+                    text += token
+                }
             case "end":
                 if field.phase == .instruction, let token = Self.pageFieldToken(field.instruction) {
                     text += token
@@ -415,18 +443,21 @@ struct DocxHTMLWriter {
             }
             return true
         case "instrText":
-            if field.phase == .instruction { field.instruction += element.stringValue ?? "" }
+            if field.phase == .instruction {
+                field.instruction += element.stringValue ?? ""
+            }
             return true
         default:
-            // Skip the stale cached page number.
             return field.phase == .result && field.token != nil
         }
     }
 
     private static func pageFieldToken(_ instruction: String?) -> String? {
         switch instruction?.split(separator: " ").first?.uppercased() {
-        case "PAGE": DocxHeaderFooter.pageToken
-        case "NUMPAGES", "SECTIONPAGES": DocxHeaderFooter.pageCountToken
+        case "PAGE":
+            DocxHeaderFooter.pageToken
+        case "NUMPAGES", "SECTIONPAGES":
+            DocxHeaderFooter.pageCountToken
         default: nil
         }
     }
@@ -434,13 +465,12 @@ struct DocxHTMLWriter {
     /// With custom tab stops, the text after the n-th tab is placed at the n-th stop, aligned by its kind.
     /// That matches Word whenever earlier text ends before the next stop, as in headers, footers and
     /// "label → value" lines. Without stops, a tab is a 36pt gap.
-    ///
-    /// Each segment gets a box that stays inside the column: anything wider widens the document,
-    /// and WebKit then shrinks every page. Stops past the right margin sit on it, as in Word.
     private func placingTabs(_ html: String, format: ParagraphFormat, markRun: RunFormat) -> String {
-        guard html.contains(where: Self.isTabMarker) else { return html }
+        guard html.contains(where: Self.isTabMarker) else {
+            return html
+        }
         let stops = (format.tabs ?? []).filter { !["clear", "bar"].contains($0.kind) }
-        // Segment n follows tab n; `absolutes` holds the alignment of absolute tabs.
+        
         var segments = [""]
         var absolutes: [String?] = [nil]
         for character in html {
@@ -456,7 +486,7 @@ struct DocxHTMLWriter {
         }
         let available = max(section.paperSize.width - section.margins.left - section.margins.right
             - (format.indentLeft ?? 0) - (format.indentRight ?? 0), 0)
-        // Positioned segments leave the flow; this keeps the line's height.
+        
         let strut = #"<span style="\#(runCSS(markRun).joined(separator: ";"))">&#8203;</span>"#
         var result = strut + segments[0]
         var stopIndex = 0
@@ -492,7 +522,6 @@ struct DocxHTMLWriter {
     }
 
     // MARK: - Drawings
-
     /// Inline and floating pictures and shapes. Floating ones are placed against their paragraph,
     /// which is how Word positions most of them (`relativeFrom="paragraph"`/`"column"`).
     private mutating func drawing(_ drawing: XMLElement) -> String {
@@ -507,11 +536,15 @@ struct DocxHTMLWriter {
 
         let isPicture = graphic?.child("pic", in: OOXMLNamespace.pic) != nil
         if container.localName == "inline", isPicture {
-            guard let fill = graphic?.firstDescendant("blipFill", in: OOXMLNamespace.pic) else { return "" }
+            guard let fill = graphic?.firstDescendant("blipFill", in: OOXMLNamespace.pic) else {
+                return ""
+            }
             if let cropped = croppedPicture(fill, css: ["display:inline-block", "vertical-align:bottom", "width:\(decimal(width))pt", "height:\(decimal(height))pt"]) {
                 return cropped
             }
-            guard let id = fill.child("blip", in: OOXMLNamespace.a)?.value("embed", in: OOXMLNamespace.r) else { return "" }
+            guard let id = fill.child("blip", in: OOXMLNamespace.a)?.value("embed", in: OOXMLNamespace.r) else {
+                return ""
+            }
             return imageTag(relationship: id, css: ["width:\(decimal(width))pt", "max-width:100%", "height:auto"])
         }
 
@@ -527,7 +560,6 @@ struct DocxHTMLWriter {
         }
         let size = ["width:\(decimal(width))pt", "height:\(decimal(height))pt"]
         if container.localName == "inline" {
-            // A text box or group in the line, as big as Word draws it.
             let box = ["display:inline-block", "position:relative", "vertical-align:bottom", "text-indent:0"] + size
             return #"<span style="\#(box.joined(separator: ";"))">\#(content)</span>"#
         }
@@ -547,20 +579,28 @@ struct DocxHTMLWriter {
         for child in group.elements {
             let xfrm: XMLElement?
             switch child.localName {
-            case "wsp": xfrm = child.child("spPr", in: OOXMLNamespace.wps)?.child("xfrm", in: OOXMLNamespace.a)
-            case "pic": xfrm = child.child("spPr", in: OOXMLNamespace.pic)?.child("xfrm", in: OOXMLNamespace.a)
-            case "grpSp": xfrm = child.child("grpSpPr", in: OOXMLNamespace.wpg)?.child("xfrm", in: OOXMLNamespace.a)
-            default: continue
+            case "wsp":
+                xfrm = child.child("spPr", in: OOXMLNamespace.wps)?.child("xfrm", in: OOXMLNamespace.a)
+            case "pic":
+                xfrm = child.child("spPr", in: OOXMLNamespace.pic)?.child("xfrm", in: OOXMLNamespace.a)
+            case "grpSp":
+                xfrm = child.child("grpSpPr", in: OOXMLNamespace.wpg)?.child("xfrm", in: OOXMLNamespace.a)
+            default:
+                continue
             }
             let offset = Self.point(xfrm?.child("off", in: OOXMLNamespace.a), "x", "y")
             let size = Self.point(xfrm?.child("ext", in: OOXMLNamespace.a), "cx", "cy")
             let (childWidth, childHeight) = (size.x * scaleX, size.y * scaleY)
             let content: String
             switch child.localName {
-            case "wsp": content = shape(child, isLine: childHeight < 1)
-            case "grpSp": content = self.group(child, width: childWidth, height: childHeight)
+            case "wsp":
+                content = shape(child, isLine: childHeight < 1)
+            case "grpSp":
+                content = self.group(child, width: childWidth, height: childHeight)
             default:
-                guard let fill = child.child("blipFill", in: OOXMLNamespace.pic) else { continue }
+                guard let fill = child.child("blipFill", in: OOXMLNamespace.pic) else {
+                    continue
+                }
                 content = picture(fill)
             }
             let css = [
@@ -575,8 +615,12 @@ struct DocxHTMLWriter {
 
     /// A picture filling its box, cropped as `a:srcRect` says.
     private func picture(_ blipFill: XMLElement) -> String {
-        if let cropped = croppedPicture(blipFill, css: ["display:block", "width:100%", "height:100%"]) { return cropped }
-        guard let id = blipFill.child("blip", in: OOXMLNamespace.a)?.value("embed", in: OOXMLNamespace.r) else { return "" }
+        if let cropped = croppedPicture(blipFill, css: ["display:block", "width:100%", "height:100%"]) {
+            return cropped
+        }
+        guard let id = blipFill.child("blip", in: OOXMLNamespace.a)?.value("embed", in: OOXMLNamespace.r) else {
+            return ""
+        }
         return imageTag(relationship: id, css: ["display:block", "width:100%", "height:100%"])
     }
 
@@ -584,13 +628,17 @@ struct DocxHTMLWriter {
     /// enlarged so the kept part fills the box. Nil when nothing is cropped.
     private func croppedPicture(_ blipFill: XMLElement, css: [String]) -> String? {
         guard let id = blipFill.child("blip", in: OOXMLNamespace.a)?.value("embed", in: OOXMLNamespace.r),
-              let crop = blipFill.child("srcRect", in: OOXMLNamespace.a) else { return nil }
-        // Thousandths of a percent of the image, from each edge.
+              let crop = blipFill.child("srcRect", in: OOXMLNamespace.a) else {
+            return nil
+        }
+        
         let edge = { (name: String) in (crop.attribute(forName: name)?.stringValue).flatMap(Double.init).map { $0 / 100_000 } ?? 0 }
         let (left, top, right, bottom) = (edge("l"), edge("t"), edge("r"), edge("b"))
         let keptWidth = 1 - left - right
         let keptHeight = 1 - top - bottom
-        guard keptWidth > 0, keptHeight > 0, left != 0 || top != 0 || right != 0 || bottom != 0 else { return nil }
+        guard keptWidth > 0, keptHeight > 0, left != 0 || top != 0 || right != 0 || bottom != 0 else {
+            return nil
+        }
         let image = imageTag(relationship: id, css: [
             "position:absolute", "max-width:none",
             "width:\(decimal(100 / keptWidth))%", "height:\(decimal(100 / keptHeight))%",
@@ -609,10 +657,14 @@ struct DocxHTMLWriter {
         let horizontal = anchor.child("positionH", in: OOXMLNamespace.wp)
         var left: Double
         switch horizontal?.child("align", in: OOXMLNamespace.wp)?.stringValue {
-        case "center": left = (columnWidth - width) / 2
-        case "right", "outside": left = columnWidth - width
-        case "left", "inside": left = 0
-        default: left = Self.emu(horizontal?.child("posOffset", in: OOXMLNamespace.wp)?.stringValue) ?? 0
+        case "center":
+            left = (columnWidth - width) / 2
+        case "right", "outside":
+            left = columnWidth - width
+        case "left", "inside":
+            left = 0
+        default:
+            left = Self.emu(horizontal?.child("posOffset", in: OOXMLNamespace.wp)?.stringValue) ?? 0
         }
         if horizontal?.attribute(forName: "relativeFrom")?.stringValue == "page" {
             left -= section.margins.left
@@ -658,9 +710,15 @@ struct DocxHTMLWriter {
             let isTiled = blipFill.child("tile", in: OOXMLNamespace.a) != nil
             css += ["background-image:url(\(uri))", isTiled ? "background-repeat:repeat" : "background-size:100% 100%"]
         }
-        if let outlineColor { css.append("border:\(decimal(outlineWidth))pt solid \(outlineColor)") }
-        if geometry == "roundRect" { css.append("border-radius:10%") }
-        if geometry == "ellipse" { css.append("border-radius:50%") }
+        if let outlineColor {
+            css.append("border:\(decimal(outlineWidth))pt solid \(outlineColor)")
+        }
+        if geometry == "roundRect" {
+            css.append("border-radius:10%")
+        }
+        if geometry == "ellipse" {
+            css.append("border-radius:50%")
+        }
         var text = ""
         if let content = wsp.child("txbx", in: OOXMLNamespace.wps)?.child("txbxContent") {
             // Insets default to 0.1 inch at the sides and 0.05 inch above and below.
@@ -669,8 +727,10 @@ struct DocxHTMLWriter {
             css.append("padding:" + insets.map { "\(decimal($0))pt" }.joined(separator: " "))
             css += ["text-indent:0", "overflow:hidden"]
             switch body?.attribute(forName: "anchor")?.stringValue {
-            case "ctr": css += ["display:flex", "flex-direction:column", "justify-content:center"]
-            case "b": css += ["display:flex", "flex-direction:column", "justify-content:flex-end"]
+            case "ctr":
+                css += ["display:flex", "flex-direction:column", "justify-content:center"]
+            case "b":
+                css += ["display:flex", "flex-direction:column", "justify-content:flex-end"]
             default: break
             }
             text = rendering { $0.blocks(content.elements) }
@@ -707,7 +767,9 @@ struct DocxHTMLWriter {
     /// Pre-2010 VML pictures: `<v:imagedata r:id>` inside `<v:shape style="width:…;height:…">`.
     private func vmlImage(_ pict: XMLElement) -> String {
         guard let data = pict.firstDescendant("imagedata", in: OOXMLNamespace.v),
-              let id = data.value("id", in: OOXMLNamespace.r) else { return "" }
+              let id = data.value("id", in: OOXMLNamespace.r) else {
+            return ""
+        }
         let shapeStyle = pict.firstDescendant("shape", in: OOXMLNamespace.v)?.attribute(forName: "style")?.stringValue ?? ""
         let size = shapeStyle.split(separator: ";").filter { $0.hasPrefix("width") || $0.hasPrefix("height") }.map(String.init)
         return imageTag(relationship: id, css: size)
@@ -726,7 +788,9 @@ struct DocxHTMLWriter {
     private func dataURI(relationship id: String) -> String? {
         guard let path = relationships[id],
               let mime = Self.imageTypes[URL(filePath: path).pathExtension.lowercased()],
-              let data = try? package.data(at: path) else { return nil }
+              let data = try? package.data(at: path) else {
+            return nil
+        }
         return "data:\(mime);base64,\(data.base64EncodedString())"
     }
 
@@ -736,7 +800,6 @@ struct DocxHTMLWriter {
     ]
 
     // MARK: - Tables
-
     private struct Cell {
         var element: XMLElement
         var column: Int
@@ -779,8 +842,10 @@ struct DocxHTMLWriter {
             css.append("width:\(decimal(grid.reduce(0, +)))pt")
         }
         switch tblPr?.child("jc")?.value() {
-        case "center": css.append("margin-left:auto;margin-right:auto")
-        case "right", "end": css.append("margin-left:auto")
+        case "center":
+            css.append("margin-left:auto;margin-right:auto")
+        case "right", "end":
+            css.append("margin-left:auto")
         default:
             if let indent = tblPr?.child("tblInd")?.number("w") {
                 css.append("margin-left:\(decimal(twips(indent)))pt")
@@ -795,8 +860,17 @@ struct DocxHTMLWriter {
             for cell in row where !cell.isContinuation {
                 let saved = tableCellFormat
                 tableCellFormat = styles.tableCellFormat(styleID: tableStyle)
-                defer { tableCellFormat = saved }
-                html += tableCell(cell, row: rowIndex, rowCount: rows.count, columnCount: grid.count, tableBorders: tableBorders, margins: cellMargins)
+                defer {
+                    tableCellFormat = saved
+                }
+                html += tableCell(
+                    cell,
+                    row: rowIndex,
+                    rowCount: rows.count,
+                    columnCount: grid.count,
+                    tableBorders: tableBorders,
+                    margins: cellMargins
+                )
             }
             html += "</tr>\n"
         }
@@ -807,7 +881,9 @@ struct DocxHTMLWriter {
     private static func cellMargins(_ element: XMLElement?, default defaults: [String: Double]) -> [String: Double] {
         var margins = defaults
         for (side, names) in [("top", ["top"]), ("right", ["right", "end"]), ("bottom", ["bottom"]), ("left", ["left", "start"])] {
-            if let width = names.lazy.compactMap({ element?.child($0)?.number("w") }).first { margins[side] = twips(width) }
+            if let width = names.lazy.compactMap({ element?.child($0)?.number("w") }).first {
+                margins[side] = twips(width)
+            }
         }
         return margins
     }
@@ -835,26 +911,36 @@ struct DocxHTMLWriter {
             css.append("background:#\(fill)")
         }
         switch tcPr?.child("vAlign")?.value() {
-        case "center": css.append("vertical-align:middle")
-        case "bottom": css.append("vertical-align:bottom")
-        default: break
+        case "center":
+            css.append("vertical-align:middle")
+        case "bottom":
+            css.append("vertical-align:bottom")
+        default:
+            break
         }
 
         css.append("padding:" + ["top", "right", "bottom", "left"].map { "\(decimal(margins[$0] ?? 0))pt" }.joined(separator: " "))
         let content = rendering { $0.blocks(cell.element.elements) }
 
         var attributes = tcPr?.child("noWrap")?.isOn == true ? #" class="nowrap""# : ""
-        if cell.span > 1 { attributes += #" colspan="\#(cell.span)""# }
-        if cell.rowSpan > 1 { attributes += #" rowspan="\#(cell.rowSpan)""# }
+        if cell.span > 1 {
+            attributes += #" colspan="\#(cell.span)""#
+        }
+        if cell.rowSpan > 1 {
+            attributes += #" rowspan="\#(cell.rowSpan)""#
+        }
         return #"<td\#(attributes) style="\#(css.joined(separator: ";"))">\#(content)</td>"#
     }
 
     private static func cells(of tr: XMLElement) -> [XMLElement] {
         tr.elements.flatMap { element -> [XMLElement] in
             switch element.localName {
-            case "tc": [element]
-            case "sdt", "customXml": element.child("sdtContent").map(cells(of:)) ?? []
-            default: []
+            case "tc":
+                [element]
+            case "sdt", "customXml":
+                element.child("sdtContent").map(cells(of:)) ?? []
+            default:
+                []
             }
         }
     }
@@ -862,7 +948,9 @@ struct DocxHTMLWriter {
     /// A `vMerge` continuation grows the cell that started the merge in the same column.
     private static func extendRowSpan(in rows: inout [[Cell]], column: Int) {
         for rowIndex in rows.indices.reversed() {
-            guard let cellIndex = rows[rowIndex].firstIndex(where: { $0.column == column }) else { return }
+            guard let cellIndex = rows[rowIndex].firstIndex(where: { $0.column == column }) else {
+                return
+            }
             if !rows[rowIndex][cellIndex].isContinuation {
                 rows[rowIndex][cellIndex].rowSpan += 1
                 return
@@ -875,18 +963,34 @@ struct DocxHTMLWriter {
     private func paragraphCSS(_ format: ParagraphFormat, run: RunFormat, isEmpty: Bool) -> [String] {
         var css: [String] = []
         switch format.alignment {
-        case "center": css.append("text-align:center")
-        case "right", "end": css.append("text-align:right")
-        case "both", "distribute": css.append("text-align:justify")
-        default: break
+        case "center":
+            css.append("text-align:center")
+        case "right", "end":
+            css.append("text-align:right")
+        case "both", "distribute":
+            css.append("text-align:justify")
+        default:
+            break
         }
-        if let left = format.indentLeft, left != 0 { css.append("margin-left:\(decimal(left))pt") }
-        if let right = format.indentRight, right != 0 { css.append("margin-right:\(decimal(right))pt") }
-        if let first = format.firstLine, first != 0 { css.append("text-indent:\(decimal(first))pt") }
+        if let left = format.indentLeft, left != 0 {
+            css.append("margin-left:\(decimal(left))pt")
+        }
+        if let right = format.indentRight, right != 0 {
+            css.append("margin-right:\(decimal(right))pt")
+        }
+        if let first = format.firstLine, first != 0 {
+            css.append("text-indent:\(decimal(first))pt")
+        }
         // Word adds spacing after and before; CSS margins would collapse to the larger one.
-        if let before = format.spaceBefore, before != 0 { css.append("padding-top:\(decimal(before))pt") }
-        if let after = format.spaceAfter, after != 0 { css.append("padding-bottom:\(decimal(after))pt") }
-        if let shading = format.shading { css.append("background:\(shading)") }
+        if let before = format.spaceBefore, before != 0 {
+            css.append("padding-top:\(decimal(before))pt")
+        }
+        if let after = format.spaceAfter, after != 0 {
+            css.append("padding-bottom:\(decimal(after))pt")
+        }
+        if let shading = format.shading {
+            css.append("background:\(shading)")
+        }
         // The paragraph mark's font sets the height of empty lines only; otherwise the runs do, and a
         // zero line height keeps the paragraph's own font from propping lines up.
         css += runCSS(run).filter { $0.hasPrefix("font-size") || $0.hasPrefix("font-family") }
@@ -897,10 +1001,14 @@ struct DocxHTMLWriter {
     private func lineHeightCSS(_ run: RunFormat) -> String {
         let single = singleLineHeight(run)
         return switch lineSpacing {
-        case .multiple(let factor): "line-height:\(decimal(factor * single))"
-        case .exactly(let points): "line-height:\(decimal(points))pt"
-        case .atLeast(let points): "line-height:max(\(decimal(points))pt,\(decimal(single))em)"
-        case nil: "line-height:\(decimal(single))"
+        case .multiple(let factor): 
+            "line-height:\(decimal(factor * single))"
+        case .exactly(let points): 
+            "line-height:\(decimal(points))pt"
+        case .atLeast(let points): 
+            "line-height:max(\(decimal(points))pt,\(decimal(single))em)"
+        case nil: 
+            "line-height:\(decimal(single))"
         }
     }
 
@@ -916,8 +1024,12 @@ struct DocxHTMLWriter {
     /// the rest are the fonts' win metrics.
     private static let singleLineHeights: [String: Double] = {
         var table: [String: Double] = [:]
-        for name in ["맑은 고딕", "Malgun Gothic"] { table[name] = 1.72 }
-        for name in ["Calibri", "Calibri Light"] { table[name] = 1.22 }
+        for name in ["맑은 고딕", "Malgun Gothic"] {
+            table[name] = 1.72
+        }
+        for name in ["Calibri", "Calibri Light"] {
+            table[name] = 1.22
+        }
         table["Times New Roman"] = 1.11
         table["Arial"] = 1.12
         return table
@@ -925,17 +1037,30 @@ struct DocxHTMLWriter {
 
     private func runCSS(_ format: RunFormat) -> [String] {
         var css: [String] = []
-        if format.bold == true { css.append("font-weight:bold") }
-        if format.italic == true { css.append("font-style:italic") }
+        if format.bold == true {
+            css.append("font-weight:bold")
+        }
+        if format.italic == true {
+            css.append("font-style:italic")
+        }
         let decorations = [format.underline == true ? "underline" : nil, format.strike == true ? "line-through" : nil].compactMap { $0 }
-        if !decorations.isEmpty { css.append("text-decoration:\(decorations.joined(separator: " "))") }
-        if let color = format.color { css.append("color:\(color)") }
-        if let highlight = format.highlight { css.append("background:\(highlight)") }
+        if !decorations.isEmpty {
+            css.append("text-decoration:\(decorations.joined(separator: " "))")
+        }
+        if let color = format.color {
+            css.append("color:\(color)")
+        }
+        if let highlight = format.highlight {
+            css.append("background:\(highlight)")
+        }
         let size = format.sizePt ?? 10
         switch format.verticalAlign {
-        case "superscript": css += ["font-size:\(decimal(size * 0.65))pt", "vertical-align:super"]
-        case "subscript": css += ["font-size:\(decimal(size * 0.65))pt", "vertical-align:sub"]
-        default: css.append("font-size:\(decimal(size))pt")
+        case "superscript":
+            css += ["font-size:\(decimal(size * 0.65))pt", "vertical-align:super"]
+        case "subscript":
+            css += ["font-size:\(decimal(size * 0.65))pt", "vertical-align:sub"]
+        default:
+            css.append("font-size:\(decimal(size))pt")
         }
         css.append("font-family:\(fontFamily(format))")
         css.append(lineHeightCSS(format))
@@ -951,7 +1076,7 @@ struct DocxHTMLWriter {
         names += ["Apple SD Gothic Neo"]
         var seen: Set<String> = []
         let unique = names.filter { seen.insert($0).inserted }
-        // Single quotes: these lists go inside double-quoted style attributes.
+        
         return (unique.map { "'\($0.replacingOccurrences(of: "'", with: ""))'" } + ["sans-serif"]).joined(separator: ",")
     }
 
@@ -975,7 +1100,6 @@ struct DocxHTMLWriter {
     }()
 
     private static func symbol(_ code: UInt32) -> String {
-        // Symbol/Wingdings code points are often written in the F0xx private range.
         let mapped: UInt32 = (0xF000...0xF0FF).contains(code) ? code - 0xF000 : code
         return UnicodeScalar(mapped).map(String.init) ?? ""
     }
@@ -988,7 +1112,6 @@ struct DocxHTMLWriter {
     }
 
     // MARK: - Document
-
     /// Splits each multi-column section's blocks into pages of side-by-side columns, filled one
     /// after another as Word does. A block taller than what is left of a column starts the next.
     /// Runs on the laid-out page, before printing.
@@ -1047,7 +1170,9 @@ struct DocxHTMLWriter {
     """
 
     static func pageSetup(_ sectPr: XMLElement?) -> PagedPDFRenderer.PageSetup {
-        guard let sectPr else { return .a4 }
+        guard let sectPr else {
+            return .a4
+        }
         var page = PagedPDFRenderer.PageSetup.a4
         if let size = sectPr.child("pgSz"), let width = size.number("w"), let height = size.number("h") {
             page.paperSize = CGSize(width: twips(width), height: twips(height))

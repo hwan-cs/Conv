@@ -20,7 +20,6 @@ public final class DropModel {
     public struct Item: Identifiable, Equatable {
         public enum Status: Equatable {
             case waiting
-            /// With how far along it is, once the service has said.
             case converting(Double?)
             case done(URL)
             case failed(String)
@@ -29,7 +28,6 @@ public final class DropModel {
         public let id = UUID()
         public let url: URL
         public let size: Int64?
-        /// Made from the clipboard in the app's own folder, so there is no "beside the original".
         public var isPasted = false
         /// Quick Look's preview, once it has made one.
         public var thumbnail: CGImage?
@@ -71,8 +69,10 @@ public final class DropModel {
     public var settledCount: Int {
         items.filter {
             switch $0.status {
-            case .waiting, .converting: false
-            case .done, .failed: true
+            case .waiting, .converting:
+                false
+            case .done, .failed:
+                true
             }
         }.count
     }
@@ -81,7 +81,9 @@ public final class DropModel {
     public var overallProgress: Double {
         // Combined files move together.
         if output?.combines == true {
-            if settledCount == items.count { return 1 }
+            if settledCount == items.count {
+                return 1
+            }
             return items.lazy.compactMap { if case .converting(let fraction) = $0.status { fraction ?? 0 } else { nil } }.first ?? 0
         }
         let current = items.lazy.compactMap { if case .converting(let fraction) = $0.status { fraction ?? 0 } else { nil } }.first ?? 0
@@ -90,17 +92,22 @@ public final class DropModel {
 
     /// - Parameter format: A format picked elsewhere (Finder's menu), shown selected.
     public func accept(_ urls: [URL], isPasted: Bool = false, format: String? = nil) {
-        // Files arriving mid-conversion would be dropped from the list being converted.
-        guard phase != .converting else { return }
+        guard phase != .converting else {
+            return
+        }
         let files = urls.filter { !$0.hasDirectoryPath }
-        guard !files.isEmpty else { return }
+        guard !files.isEmpty else {
+            return
+        }
         items = files.map { url in
             withAccess(url) {
                 let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init)
                 return Item(url: url, size: size, isPasted: isPasted)
             }
         }
-        for item in items { loadThumbnail(for: item) }
+        for item in items {
+            loadThumbnail(for: item)
+        }
         if outputs.isEmpty {
             let kinds = Set(items.map { "." + $0.ext.uppercased() }).sorted().joined(separator: ", ")
             notice = items.count > 1 && items.allSatisfy({ !Formats.outputs(for: [$0.url]).isEmpty })
@@ -119,7 +126,9 @@ public final class DropModel {
     public func choose(_ output: Formats.Output) {
         self.output = output
         phase = .converting
-        Task { await convertAll(to: output) }
+        Task {
+            await convertAll(to: output)
+        }
     }
 
     public func reset() {
@@ -132,7 +141,9 @@ public final class DropModel {
 
     /// Finder sent files from a folder Conv may not read yet.
     public func explainFolderAccess(for files: [URL]) {
-        guard phase != .converting else { return }
+        guard phase != .converting else {
+            return
+        }
         reset()
         let folder = files.first?.deletingLastPathComponent().path(percentEncoded: false) ?? ""
         notice = "Finder에서 바로 바꾸려면 설정에서 이 폴더(또는 그 위 폴더)를 허용해 주세요: \(folder)"
@@ -141,7 +152,9 @@ public final class DropModel {
 
     public func revealOutputs() {
         var urls: [URL] = []
-        for case .done(let url) in items.map(\.status) where !urls.contains(url) { urls.append(url) }
+        for case .done(let url) in items.map(\.status) where !urls.contains(url) {
+            urls.append(url)
+        }
         NSWorkspace.shared.activateFileViewerSelecting(urls)
     }
 
@@ -165,14 +178,24 @@ public final class DropModel {
     private func combineAll(to output: Formats.Output) async {
         let urls = items.map(\.url)
         let scoped = urls.filter { $0.startAccessingSecurityScopedResource() }
-        defer { for url in scoped { url.stopAccessingSecurityScopedResource() } }
-        for index in items.indices { items[index].status = .converting(nil) }
+        defer {
+            for url in scoped {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        for index in items.indices {
+            items[index].status = .converting(nil)
+        }
         let status: Item.Status
         do {
             let combined = try await client.combine(urls, to: output.ext) { fraction in
-                Task { @MainActor [weak self] in self?.updateAll(progress: fraction) }
+                Task { @MainActor [weak self] in
+                    self?.updateAll(progress: fraction)
+                }
             }
-            defer { try? combined.close() }
+            defer {
+                try? combined.close()
+            }
             status = save {
                 try SiblingWriter.copyCombined(combined, of: urls, extension: output.ext, keepingBoth: false)
             } orAsk: {
@@ -190,7 +213,9 @@ public final class DropModel {
         } catch {
             status = .failed("파일을 읽을 수 없어요")
         }
-        for index in items.indices { items[index].status = status }
+        for index in items.indices {
+            items[index].status = status
+        }
         if case .done(let written) = status, let first = urls.first {
             ConversionHistory.shared.record(input: first, output: written)
         }
@@ -199,12 +224,18 @@ public final class DropModel {
     /// A PDF's pages as images: one beside it, or a folder of them.
     private func convertPages(_ item: Item, to output: Formats.Output) async -> Item.Status {
         let scoped = item.url.startAccessingSecurityScopedResource()
-        defer { if scoped { item.url.stopAccessingSecurityScopedResource() } }
+        defer {
+            if scoped {
+                item.url.stopAccessingSecurityScopedResource()
+            }
+        }
         let pages: PackedFiles.Reader
         do {
             let id = item.id
             pages = try await client.convertPages(item.url, to: output.ext) { fraction in
-                Task { @MainActor [weak self] in self?.update(id, progress: fraction) }
+                Task { @MainActor [weak self] in
+                    self?.update(id, progress: fraction)
+                }
             }
         } catch let error as ConversionClient.Failure {
             return .failed(error.description)
@@ -228,13 +259,14 @@ public final class DropModel {
         }
     }
 
-    /// Writes beside the original; when that fails (the name is taken, or the folder isn't
-    /// granted) asks where instead.
+    /// Writes beside the original; when that fails (the name is taken, or the folder isn't granted) asks where instead.
     private func save(_ beside: () throws -> URL, orAsk ask: () -> URL?, then write: (URL) throws -> URL) -> Item.Status {
         do {
             return .done(try beside())
         } catch {
-            guard let chosen = ask() else { return .failed("저장하지 않았어요") }
+            guard let chosen = ask() else {
+                return .failed("저장하지 않았어요")
+            }
             do {
                 return .done(try write(chosen))
             } catch {
@@ -244,27 +276,40 @@ public final class DropModel {
     }
 
     private func convert(_ item: Item, to output: Formats.Output) async -> Item.Status {
-        if Formats.splitsPages(item.url) { return await convertPages(item, to: output) }
+        if Formats.splitsPages(item.url) {
+            return await convertPages(item, to: output)
+        }
         let scoped = item.url.startAccessingSecurityScopedResource()
-        defer { if scoped { item.url.stopAccessingSecurityScopedResource() } }
+        defer {
+            if scoped {
+                item.url.stopAccessingSecurityScopedResource()
+            }
+        }
         let converted: FileHandle
         do {
             let id = item.id
             converted = try await client.convert(item.url, to: output.ext) { fraction in
-                Task { @MainActor [weak self] in self?.update(id, progress: fraction) }
+                Task { @MainActor [weak self] in
+                    self?.update(id, progress: fraction)
+                }
             }
         } catch let error as ConversionClient.Failure {
             return .failed(error.description)
         } catch {
             return .failed("파일을 읽을 수 없어요")
         }
-        defer { try? converted.close() }
+        defer {
+            try? converted.close()
+        }
         do {
-            guard !item.isPasted else { throw CocoaError(.fileWriteNoPermission) }
+            guard !item.isPasted else {
+                throw CocoaError(.fileWriteNoPermission)
+            }
             return .done(try SiblingWriter.copy(converted, nextTo: item.url, extension: output.ext))
         } catch {
-            // A same-named file is already there, or the folder is off limits: ask where to put it.
-            guard let chosen = askWhereToSave(item, output: output) else { return .failed("저장하지 않았어요") }
+            guard let chosen = askWhereToSave(item, output: output) else {
+                return .failed("저장하지 않았어요")
+            }
             do {
                 try SiblingWriter.copy(converted, to: chosen)
                 return .done(chosen)
@@ -294,24 +339,29 @@ public final class DropModel {
         panel.nameFieldStringValue = name
         panel.directoryURL = folder
         panel.message = message
-        if let ext, let type = UTType(filenameExtension: ext) { panel.allowedContentTypes = [type] }
+        if let ext, let type = UTType(filenameExtension: ext) {
+            panel.allowedContentTypes = [type]
+        }
         return panel.runModal() == .OK ? panel.url : nil
     }
 
     private func updateAll(progress fraction: Double) {
         for index in items.indices {
-            guard case .converting = items[index].status else { continue }
+            guard case .converting = items[index].status else {
+                continue
+            }
             items[index].status = .converting(fraction)
         }
     }
 
     private func update(_ id: Item.ID, progress fraction: Double) {
-        guard let index = items.firstIndex(where: { $0.id == id }), case .converting = items[index].status else { return }
+        guard let index = items.firstIndex(where: { $0.id == id }), case .converting = items[index].status else {
+            return
+        }
         items[index].status = .converting(fraction)
     }
 
     /// Asks Quick Look for a preview: a video's first frame, a document's first page, a photo.
-    /// Files it doesn't know, such as .hwp, keep their icon.
     private func loadThumbnail(for item: Item) {
         let (id, url) = (item.id, item.url)
         let scoped = url.startAccessingSecurityScopedResource()
@@ -322,11 +372,17 @@ public final class DropModel {
             representationTypes: .thumbnail
         )
         QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { thumbnail, _ in
-            if scoped { url.stopAccessingSecurityScopedResource() }
-            guard let image = thumbnail?.cgImage else { return }
+            if scoped {
+                url.stopAccessingSecurityScopedResource()
+            }
+            guard let image = thumbnail?.cgImage else {
+                return
+            }
             let preview = UncheckedImage(image)
             Task { @MainActor [weak self] in
-                guard let self, let index = items.firstIndex(where: { $0.id == id }) else { return }
+                guard let self, let index = items.firstIndex(where: { $0.id == id }) else {
+                    return
+                }
                 items[index].thumbnail = preview.image
             }
         }
@@ -335,7 +391,11 @@ public final class DropModel {
     /// Files from the open panel are security-scoped; dropped files are granted as they arrive.
     private func withAccess<T>(_ url: URL, _ body: () throws -> T) rethrows -> T {
         let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        defer {
+            if scoped {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
         return try body()
     }
 }
@@ -343,5 +403,7 @@ public final class DropModel {
 /// CGImage is immutable; this carries one across the Quick Look callback.
 private struct UncheckedImage: @unchecked Sendable {
     let image: CGImage
-    init(_ image: CGImage) { self.image = image }
+    init(_ image: CGImage) {
+        self.image = image
+    }
 }

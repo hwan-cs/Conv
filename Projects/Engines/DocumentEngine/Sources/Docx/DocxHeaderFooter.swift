@@ -1,9 +1,6 @@
 import Foundation
 
 /// Headers and footers per section, laid out once the body's page count is known.
-///
-/// They are written as a second, transparent document with one page per body page, then stamped
-/// onto the body: Word decides which header a page gets only after pagination, which HTML cannot see.
 struct DocxHeaderFooter {
     struct Section {
         var page: PagedPDFRenderer.PageSetup
@@ -14,7 +11,7 @@ struct DocxHeaderFooter {
         var firstText: String?
         var hasTitlePage: Bool
         var pageNumberStart: Int?
-        /// "default", "first", "even" → HTML, already inherited from earlier sections.
+        
         var headers: [String: String]
         var footers: [String: String]
     }
@@ -45,7 +42,6 @@ struct DocxHeaderFooter {
         var pages: [String] = []
         var pageNumber = 0
         for index in 0..<pageCount {
-            // A page belongs to the first section on it: a continuous section starting mid-page doesn't own it.
             let owner = sections.indices.last { section in
                 let start = sectionStarts[section]
                 return start < index || (start == index && (section == 0 || sections[section].startsNewPage))
@@ -66,10 +62,12 @@ struct DocxHeaderFooter {
             }
             let left = decimal(section.page.margins.left - page.margins.left)
             let right = decimal(section.page.margins.right - page.margins.right)
-            // The footer hangs below the shortened block to reach its true distance from the paper's edge.
+            
             let footerBottom = section.footerDistance - (page.paperSize.height - blockHeight)
             var css = ["position:relative", "height:\(decimal(blockHeight))pt"]
-            if index > 0 { css.append("break-before:page") }
+            if index > 0 {
+                css.append("break-before:page")
+            }
             pages.append("""
             <div style="\(css.joined(separator: ";"))">\
             <div style="position:absolute;left:\(left)pt;right:\(right)pt;top:\(decimal(section.headerDistance))pt">\(fill(section.headers[kind] ?? ""))</div>\

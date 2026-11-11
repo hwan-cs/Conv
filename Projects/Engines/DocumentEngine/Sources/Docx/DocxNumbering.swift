@@ -15,18 +15,26 @@ struct DocxNumbering {
     private var counters: [String: [Int: Int]] = [:]
 
     init(_ root: XMLElement?) {
-        guard let root else { return }
+        guard let root else {
+            return
+        }
         var abstract: [String: [Int: Level]] = [:]
         for element in root.children("abstractNum") {
-            guard let id = element.value("abstractNumId") else { continue }
+            guard let id = element.value("abstractNumId") else {
+                continue
+            }
             abstract[id] = Self.levels(element)
         }
         for num in root.children("num") {
             guard let id = num.value("numId"),
                   let abstractID = num.child("abstractNumId")?.value(),
-                  var levels = abstract[abstractID] else { continue }
+                  var levels = abstract[abstractID] else {
+                continue
+            }
             for override in num.children("lvlOverride") {
-                guard let index = override.value("ilvl").flatMap(Int.init) else { continue }
+                guard let index = override.value("ilvl").flatMap(Int.init) else {
+                    continue
+                }
                 if let start = override.child("startOverride")?.number() {
                     levels[index, default: Level()].start = Int(start)
                 }
@@ -44,9 +52,10 @@ struct DocxNumbering {
 
     /// Advances the counter for this list item and returns its label, e.g. "2.3." or "•".
     mutating func nextLabel(_ reference: ParagraphFormat.NumberingReference) -> String? {
-        // numId 0 means "numbering removed".
         guard reference.numID != "0", let levels = levelsByNumID[reference.numID],
-              let level = levels[reference.level] else { return nil }
+              let level = levels[reference.level] else {
+            return nil
+        }
         var counts = counters[reference.numID, default: [:]]
         counts[reference.level] = (counts[reference.level] ?? (level.start - 1)) + 1
         for deeper in counts.keys where deeper > reference.level {
@@ -69,7 +78,9 @@ struct DocxNumbering {
     private static func levels(_ abstractNum: XMLElement) -> [Int: Level] {
         var result: [Int: Level] = [:]
         for element in abstractNum.children("lvl") {
-            guard let index = element.value("ilvl").flatMap(Int.init) else { continue }
+            guard let index = element.value("ilvl").flatMap(Int.init) else {
+                continue
+            }
             result[index] = level(element)
         }
         return result
@@ -87,34 +98,49 @@ struct DocxNumbering {
 
     /// Word bullets are often private-use glyphs from the Symbol and Wingdings fonts.
     private static func bullet(_ text: String) -> String {
-        guard let scalar = text.unicodeScalars.first else { return "•" }
+        guard let scalar = text.unicodeScalars.first else {
+            return "•"
+        }
         switch scalar.value {
-        case 0xF0A7, 0xF06E: return "▪"
-        case 0xF0D8: return "➢"
-        case 0xF0FC: return "✓"
-        case 0xF000...0xF0FF: return "•"
-        default: return text == "o" ? "◦" : text
+        case 0xF0A7, 0xF06E: 
+            return "▪"
+        case 0xF0D8:
+            return "➢"
+        case 0xF0FC: 
+            return "✓"
+        case 0xF000...0xF0FF: 
+            return "•"
+        default:
+            return text == "o" ? "◦" : text
         }
     }
 
     static func render(_ value: Int, as format: String) -> String {
         switch format {
-        case "lowerLetter": letters(value).lowercased()
-        case "upperLetter": letters(value)
-        case "lowerRoman": roman(value).lowercased()
-        case "upperRoman": roman(value)
-        case "ganada": korean(value, from: ["가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하"])
-        case "chosung": korean(value, from: ["ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"])
+        case "lowerLetter":
+            letters(value).lowercased()
+        case "upperLetter":
+            letters(value)
+        case "lowerRoman":
+            roman(value).lowercased()
+        case "upperRoman":
+            roman(value)
+        case "ganada":
+            korean(value, from: ["가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하"])
+        case "chosung":
+            korean(value, from: ["ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"])
         case "decimalEnclosedCircle", "decimalEnclosedCircleChinese":
             (1...20).contains(value) ? String(UnicodeScalar(0x2460 + value - 1)!) : String(value)
-        case "decimalZero": value < 10 ? "0\(value)" : String(value)
-        case "none": ""
-        default: String(value)
+        case "decimalZero":
+            value < 10 ? "0\(value)" : String(value)
+        case "none": 
+            ""
+        default:
+            String(value)
         }
     }
 
     private static func letters(_ value: Int) -> String {
-        // Word repeats the letter: 27 → AA, 28 → BB.
         let letter = Character(UnicodeScalar(65 + (value - 1) % 26)!)
         return String(repeating: letter, count: (value - 1) / 26 + 1)
     }

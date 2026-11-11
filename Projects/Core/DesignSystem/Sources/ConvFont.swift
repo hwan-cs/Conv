@@ -7,7 +7,7 @@ public enum ConvFont {
         case regular, semibold, bold, heavy
     }
 
-    /// Registers the bundled fonts for this process. Safe to call more than once.
+    /// Registers the bundled fonts for this process.
     public static func register() {
         _ = registration
     }

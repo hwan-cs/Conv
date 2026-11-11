@@ -1,7 +1,7 @@
 import Cocoa
 import FinderSync
 
-/// Adds "conv.로 바꾸기" to Finder's context menu.
+/// Adds "conv로 바꾸기" to Finder's context menu.
 ///
 /// The extension converts nothing itself: its sandbox can neither write beside the files nor pass
 /// access to them on. It posts the selection's paths and the picked format to the app, launching
@@ -18,7 +18,7 @@ final class FinderSync: FIFinderSync {
 
         let outputs = Formats.outputs(for: files)
         guard !outputs.isEmpty else { return menu }
-        let submenu = NSMenu(title: "conv.로 바꾸기")
+        let submenu = NSMenu(title: "conv로 바꾸기")
         for (index, output) in outputs.enumerated() {
             let name = output.combines ? "\(output.ext.uppercased()) 하나로 합치기" : ".\(output.ext.uppercased())"
             let title = name + (index == 0 ? "  (추천)" : "")
@@ -29,11 +29,11 @@ final class FinderSync: FIFinderSync {
             submenu.addItem(item)
         }
         // No separator: Finder draws one from an extension as an empty row.
-        let more = NSMenuItem(title: "conv.에서 더 보기…", action: #selector(openInConv(_:)), keyEquivalent: "")
+        let more = NSMenuItem(title: "conv에서 더 보기…", action: #selector(openInConv(_:)), keyEquivalent: "")
         more.target = self
         submenu.addItem(more)
 
-        let root = NSMenuItem(title: "conv.로 바꾸기", action: nil, keyEquivalent: "")
+        let root = NSMenuItem(title: "conv로 바꾸기", action: nil, keyEquivalent: "")
         root.submenu = submenu
         menu.addItem(root)
         return menu

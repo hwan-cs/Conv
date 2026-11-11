@@ -39,7 +39,9 @@ struct DocxPackage {
     }
 
     func xml(at path: String) throws -> XMLElement? {
-        guard let data = try data(at: path) else { return nil }
+        guard let data = try data(at: path) else {
+            return nil
+        }
         return try XMLDocument(data: Self.protectingBlankText(data)).rootElement()
     }
 
@@ -50,7 +52,9 @@ struct DocxPackage {
 
     /// Parts referenced from the main document by relationship type suffix, e.g. "styles".
     func partPath(ofType type: String) throws -> String? {
-        guard let rels = try xml(at: Self.relsPath(for: documentPath)) else { return nil }
+        guard let rels = try xml(at: Self.relsPath(for: documentPath)) else {
+            return nil
+        }
         return rels.elements
             .first { ($0.attribute(forName: "Type")?.stringValue ?? "").hasSuffix("/\(type)") }
             .flatMap { $0.attribute(forName: "Target")?.stringValue }
@@ -64,12 +68,16 @@ struct DocxPackage {
     private static func protectingBlankText(_ data: Data) -> Data {
         let blankText = /(<w:t(?: [^>]*)?>)([ \t\u{3000}]+)(<\/w:t>)/
         let xml = String(decoding: data, as: UTF8.self)
-        guard xml.contains(blankText) else { return data }
+        guard xml.contains(blankText) else {
+            return data
+        }
         return Data(xml.replacing(blankText) { "\($0.1)\(blankTextMarker)\($0.2)\($0.3)" }.utf8)
     }
 
     private static func data(in archive: Archive, at path: String) throws -> Data? {
-        guard let entry = archive[path] else { return nil }
+        guard let entry = archive[path] else {
+            return nil
+        }
         var data = Data()
         _ = try archive.extract(entry) { data.append($0) }
         return data
@@ -77,11 +85,15 @@ struct DocxPackage {
 
     private static func relationships(in archive: Archive, for part: String) throws -> [String: String] {
         guard let data = try data(in: archive, at: relsPath(for: part)),
-              let root = try XMLDocument(data: data).rootElement() else { return [:] }
+              let root = try XMLDocument(data: data).rootElement() else {
+            return [:]
+        }
         var result: [String: String] = [:]
         for rel in root.elements where rel.attribute(forName: "TargetMode")?.stringValue != "External" {
             guard let id = rel.attribute(forName: "Id")?.stringValue,
-                  let target = rel.attribute(forName: "Target")?.stringValue else { continue }
+                  let target = rel.attribute(forName: "Target")?.stringValue else {
+                continue
+            }
             result[id] = resolve(target, relativeTo: part)
         }
         return result
@@ -95,7 +107,9 @@ struct DocxPackage {
     }
 
     private static func resolve(_ target: String, relativeTo part: String) -> String {
-        if target.hasPrefix("/") { return String(target.dropFirst()) }
+        if target.hasPrefix("/") {
+            return String(target.dropFirst())
+        }
         let base = URL(filePath: "/" + part).deletingLastPathComponent()
         return String(base.appending(path: target).standardized.path().dropFirst())
     }
@@ -116,8 +130,12 @@ extension XMLElement {
 
     func firstDescendant(_ name: String, in namespace: String) -> XMLElement? {
         for element in elements {
-            if element.localName == name && element.uri == namespace { return element }
-            if let found = element.firstDescendant(name, in: namespace) { return found }
+            if element.localName == name && element.uri == namespace {
+                return element
+            }
+            if let found = element.firstDescendant(name, in: namespace) {
+                return found
+            }
         }
         return nil
     }

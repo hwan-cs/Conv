@@ -19,7 +19,6 @@ enum HwpOfficeMath {
 
         mutating func children(of element: XMLElement, top: Bool = false) -> String {
             let elements = (element.children ?? []).compactMap { $0 as? XMLElement }
-            // A top-level table of rows is Hangul's multi-line equation: an equation array.
             if top, elements.count == 1, elements[0].localName == "mtable", elements[0].attribute(forName: "columnalign") != nil {
                 let rows = rows(of: elements[0]).map { "<m:e>\($0.joined())</m:e>" }
                 return "<m:eqArr>\(rows.joined())</m:eqArr>"
@@ -33,7 +32,6 @@ enum HwpOfficeMath {
             switch element.localName ?? "" {
             case "mi":
                 let text = element.stringValue ?? ""
-                // Single letters are italic in math; names like "sin" are upright.
                 let isNormal = element.attribute(forName: "mathvariant")?.stringValue == "normal" || text.count > 1
                 return run(text, upright: isNormal)
             case "mn", "mo":
@@ -67,7 +65,6 @@ enum HwpOfficeMath {
                 return "<m:limUpp><m:e>\(part(0))</m:e><m:lim>\(part(1))</m:lim></m:limUpp>"
             case "munderover":
                 let base = parts.first?.stringValue ?? ""
-                // Sums, products and integrals are n-ary operators with limits.
                 if parts.first?.localName == "mo", base.count == 1 {
                     return "<m:nary><m:naryPr><m:chr m:val=\"\(attribute(base))\"/><m:limLoc m:val=\"undOvr\"/></m:naryPr><m:sub>\(part(1))</m:sub><m:sup>\(part(2))</m:sup><m:e/></m:nary>"
                 }
@@ -78,7 +75,6 @@ enum HwpOfficeMath {
             case "menclose":
                 return "<m:borderBox><m:e>\(children(of: element))</m:e></m:borderBox>"
             default:
-                // mrow, math, mstyle and anything else: its children in sequence.
                 return children(of: element)
             }
         }
@@ -91,10 +87,16 @@ enum HwpOfficeMath {
         }
 
         func run(_ text: String, upright: Bool, literal: Bool = false) -> String {
-            guard !text.isEmpty else { return "" }
+            guard !text.isEmpty else {
+                return ""
+            }
             var properties = ""
-            if literal { properties += "<m:lit/>" }
-            if upright { properties += "<m:sty m:val=\"p\"/>" }
+            if literal {
+                properties += "<m:lit/>"
+            }
+            if upright {
+                properties += "<m:sty m:val=\"p\"/>"
+            }
             let math = properties.isEmpty ? "" : "<m:rPr>\(properties)</m:rPr>"
             return "<m:r>\(math)<w:rPr><w:rFonts w:ascii=\"Cambria Math\" w:hAnsi=\"Cambria Math\"/><w:sz w:val=\"\(size)\"/><w:szCs w:val=\"\(size)\"/></w:rPr>"
                 + "<m:t xml:space=\"preserve\">\(HwpDocxWriter.escape(text))</m:t></m:r>"

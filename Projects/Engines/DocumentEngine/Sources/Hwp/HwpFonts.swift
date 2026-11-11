@@ -7,7 +7,6 @@ import Foundation
 /// Hangul (and its Mac viewer) draws missing faces with its own 함초롬 faces; Korean system
 /// faces like 굴림 and 바탕 are full-width. macOS has neither, and its Korean faces are narrower.
 enum HwpFonts {
-    /// Average advances in em: Hangul syllables, Latin text, and the space.
     struct Advances {
         var hangul: Double
         var latin: Double
@@ -16,10 +15,8 @@ enum HwpFonts {
 
     struct Choice {
         var family: String
-        /// How the face Hangul would use advances, and how the chosen face does.
         var target: Advances
         var actual: Advances
-        /// The bundled face the family names, which the page must embed for WebKit to find.
         var bundled: Bundled?
     }
 
@@ -36,11 +33,12 @@ enum HwpFonts {
                 ?? Bundle.module.url(forResource: "\(rawValue)-\(bold ? "Bold" : "Regular")", withExtension: "ttf")
         }
 
-        /// `@font-face` rules with the faces inline: WebKit lays pages out in another process,
-        /// which doesn't see fonts registered in this one.
+        /// `@font-face` rules with the faces inline: WebKit lays pages out in another process, which doesn't see fonts registered in this one.
         var fontFaces: String {
             [false, true].compactMap { bold -> String? in
-                guard let url = url(bold: bold), let data = try? Data(contentsOf: url) else { return nil }
+                guard let url = url(bold: bold), let data = try? Data(contentsOf: url) else {
+                    return nil
+                }
                 return "@font-face { font-family: '\(cssFamily)'; font-weight: \(bold ? 700 : 400); src: url(data:font/ttf;base64,\(data.base64EncodedString())) format('truetype'); }"
             }.joined(separator: "\n")
         }
@@ -54,7 +52,9 @@ enum HwpFonts {
     private static let registration: Void = {
         for face in Bundled.allCases {
             for bold in [false, true] {
-                if let url = face.url(bold: bold) { CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil) }
+                if let url = face.url(bold: bold) {
+                    CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+                }
             }
         }
     }()
@@ -64,14 +64,10 @@ enum HwpFonts {
     static let hamchoromBatang = Advances(hangul: 0.97, latin: 0.508, space: 0.3)
     static let fullWidth = Advances(hangul: 1.0, latin: 0.5, space: 0.333)
 
-    /// Stand-ins: the bundled Nanum faces, whose widths are closest to 함초롬's and whose serif has
-    /// a bold (WebKit fakes AppleMyungjo's bold by drawing text several times, which repeats it in
-    /// the PDF's text). The system faces are only a fallback should the resources be missing.
     static let systemSerif = "AppleMyungjo"
     static let systemSans = "Apple SD Gothic Neo"
 
     private static let serifHints = ["바탕", "명조", "Batang", "Myeongjo", "Myungjo", "신명", "궁서", "Gungsuh", "Times", "Serif", "serif", "필기", "펜"]
-    /// Windows' classic Korean faces, whose Hangul is a full em wide.
     private static let fullWidthHints = ["굴림", "돋움", "바탕", "궁서", "Gulim", "Dotum", "Batang", "Gungsuh"]
 
     private static let cache = Cache()
@@ -80,7 +76,9 @@ enum HwpFonts {
         registerBundled()
         let names = [font?.name, font?.fallback].compactMap { $0 }
         let key = names.joined(separator: "|")
-        if let cached = cache.value(for: key) { return cached }
+        if let cached = cache.value(for: key) {
+            return cached
+        }
         let result = resolve(names)
         cache.store(result, for: key)
         return result
@@ -138,7 +136,11 @@ enum HwpFonts {
         private let lock = NSLock()
         private var choices: [String: Choice] = [:]
 
-        func value(for key: String) -> Choice? { lock.withLock { choices[key] } }
-        func store(_ choice: Choice, for key: String) { lock.withLock { choices[key] = choice } }
+        func value(for key: String) -> Choice? {
+            lock.withLock { choices[key] }
+        }
+        func store(_ choice: Choice, for key: String) {
+            lock.withLock { choices[key] = choice }
+        }
     }
 }

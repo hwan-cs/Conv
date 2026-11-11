@@ -15,7 +15,9 @@ public struct MarkdownConverter {
     public init() {}
 
     public func convert(_ input: URL, to output: URL) async throws {
-        guard let data = try? Data(contentsOf: input) else { throw ConversionError.unreadable }
+        guard let data = try? Data(contentsOf: input) else {
+            throw ConversionError.unreadable
+        }
         let source = String(decoding: data, as: UTF8.self)
         let title = input.deletingPathExtension().lastPathComponent
         let html = Self.page(for: source, title: title)
@@ -23,7 +25,7 @@ public struct MarkdownConverter {
         case "html", "htm":
             try Data(html.utf8).write(to: output)
         case "pdf":
-            let margin = 56.69 // 2 cm
+            let margin = 56.69
             let page = PagedPDFRenderer.PageSetup(
                 paperSize: PagedPDFRenderer.PageSetup.a4.paperSize,
                 margins: .init(top: margin, left: margin, bottom: margin, right: margin)
@@ -64,7 +66,9 @@ public struct MarkdownConverter {
         let lines = markdown.split(separator: "\n", omittingEmptySubsequences: false)
         guard lines.first?.trimmingCharacters(in: .whitespaces) == "---",
               let end = lines.dropFirst().firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "---" || $0 == "..." })
-        else { return markdown }
+        else {
+            return markdown
+        }
         return lines[(end + 1)...].joined(separator: "\n")
     }
 
@@ -125,19 +129,22 @@ struct MarkdownHTML: MarkupWalker {
         var escaped = ""
         for character in text {
             switch character {
-            case "&": escaped += "&amp;"
-            case "<": escaped += "&lt;"
-            case ">": escaped += "&gt;"
-            case "\"" where quotes: escaped += "&quot;"
-            default: escaped.append(character)
+            case "&": 
+                escaped += "&amp;"
+            case "<": 
+                escaped += "&lt;"
+            case ">": 
+                escaped += "&gt;"
+            case "\"" where quotes: 
+                escaped += "&quot;"
+            default:
+                escaped.append(character)
             }
         }
         return escaped
     }
 
     private static func attribute(_ value: String) -> String { escape(value, quotes: true) }
-
-    // Blocks
 
     mutating func visitHeading(_ heading: Heading) {
         let id = heading.plainText.lowercased()
@@ -221,7 +228,9 @@ struct MarkdownHTML: MarkupWalker {
     }
 
     mutating func visitTableBody(_ body: Table.Body) {
-        guard body.childCount > 0 else { return }
+        guard body.childCount > 0 else {
+            return
+        }
         result += "<tbody>\n"
         descendInto(body)
         result += "</tbody>\n"
@@ -238,10 +247,14 @@ struct MarkdownHTML: MarkupWalker {
         let tag = inTableHead ? "th" : "td"
         let alignment = column < tableAlignments.count ? tableAlignments[column] : nil
         let align = switch alignment {
-        case .left: " style=\"text-align:left\""
-        case .center: " style=\"text-align:center\""
-        case .right: " style=\"text-align:right\""
-        case nil: ""
+        case .left: 
+            " style=\"text-align:left\""
+        case .center: 
+            " style=\"text-align:center\""
+        case .right: 
+            " style=\"text-align:right\""
+        case nil: 
+            ""
         }
         let spans = (cell.colspan > 1 ? " colspan=\"\(cell.colspan)\"" : "") + (cell.rowspan > 1 ? " rowspan=\"\(cell.rowspan)\"" : "")
         result += "<\(tag)\(align)\(spans)>"
@@ -251,7 +264,6 @@ struct MarkdownHTML: MarkupWalker {
     }
 
     // Inlines
-
     mutating func visitText(_ text: Text) {
         result += Self.escape(text.string)
     }

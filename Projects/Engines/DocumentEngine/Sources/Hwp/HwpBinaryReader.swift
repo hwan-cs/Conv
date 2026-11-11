@@ -20,7 +20,6 @@ struct HwpBinaryReader {
     }
 
     // MARK: DocInfo
-
     private func readDocInfo(into document: inout HwpDocument) throws {
         let records = try file.docInfo()
         var fontCounts: [Int] = []
@@ -30,14 +29,13 @@ struct HwpBinaryReader {
             var reader = ByteReader(record.payload)
             switch record.tag {
             case HwpTag.idMappings:
-                // binData, then the seven face-name counts.
                 _ = reader.int32()
                 fontCounts = (0..<7).map { _ in Int(reader.int32()) }
             case HwpTag.binData:
-                // Pictures name an item by its place among these records, not by its storage's
-                // number (BIN0006 may come first).
                 binCount += 1
-                if let item = binItem(record.payload) { document.binData[binCount] = item }
+                if let item = binItem(record.payload) {
+                    document.binData[binCount] = item
+                }
             case HwpTag.faceName:
                 let flags = reader.uint8()
                 let name = reader.string()
@@ -46,8 +44,12 @@ struct HwpBinaryReader {
                     _ = reader.uint8()
                     fallback = reader.string()
                 }
-                if flags & 0x40 != 0 { reader.skip(10) }
-                if flags & 0x20 != 0 { fallback = reader.string() }
+                if flags & 0x40 != 0 {
+                    reader.skip(10)
+                }
+                if flags & 0x20 != 0 {
+                    fallback = reader.string()
+                }
                 // Faces arrive grouped by script, in the counts ID_MAPPINGS announced.
                 var script = 0
                 var remaining = fontIndex
@@ -82,7 +84,9 @@ struct HwpBinaryReader {
     private func binItem(_ payload: Data) -> HwpDocument.BinItem? {
         var reader = ByteReader(payload)
         let flags = reader.uint16()
-        guard flags & 0xF != 0 else { return nil } // Linked files are outside the document.
+        guard flags & 0xF != 0 else {
+            return nil
+        }
         let id = Int(reader.uint16())
         let ext = flags & 0xF == 1 ? reader.string() : "ole"
         let name = String(format: "BIN%04X.%@", id, ext)
@@ -105,36 +109,53 @@ struct HwpBinaryReader {
         }
         reader.skip(6) // Diagonal.
         let fill = Self.fill(&reader)
-        return HwpDocument.BorderFill(left: sides[0], right: sides[1], top: sides[2], bottom: sides[3], fill: fill.color, image: fill.image)
+        return HwpDocument.BorderFill(
+            left: sides[0],
+            right: sides[1],
+            top: sides[2],
+            bottom: sides[3],
+            fill: fill.color,
+            image: fill.image
+        )
     }
 
     /// 채우기 정보: a color, a gradation, a picture, each present by its bit in the type.
     static func fill(_ reader: inout ByteReader) -> (color: HwpDocument.Color?, image: HwpDocument.ImageFill?) {
-        guard reader.remaining >= 4 else { return (nil, nil) }
+        guard reader.remaining >= 4 else {
+            return (nil, nil)
+        }
         let type = reader.uint32()
         var color: HwpDocument.Color?
         if type & 1 != 0 {
             // Hatch patterns are drawn as their background color.
             color = HwpDocument.Color(colorRef: reader.uint32())
-            reader.skip(8) // Pattern color and kind.
+            reader.skip(8)
         }
         if type & 4 != 0 {
             // A gradation is drawn as its first color.
-            reader.skip(10) // Kind, angle, center, blur.
+            reader.skip(10)
             let count = Int(reader.int16())
-            guard count > 0, count < 1000 else { return (color, nil) }
-            if count > 2 { reader.skip(count * 4) }
+            guard count > 0, count < 1000 else {
+                return (color, nil)
+            }
+            if count > 2 {
+                reader.skip(count * 4)
+            }
             let first = reader.uint32()
             reader.skip((count - 1) * 4)
-            if color == nil { color = HwpDocument.Color(colorRef: first) }
+            if color == nil {
+                color = HwpDocument.Color(colorRef: first)
+            }
         }
         var image: HwpDocument.ImageFill?
         if type & 2 != 0, reader.remaining >= 6 {
             let code = Int(reader.uint8())
-            reader.skip(2) // Brightness, contrast.
+            reader.skip(2)
             let effect = HwpDocument.Picture.Effect(code: Int(reader.uint8()))
             let binID = Int(reader.uint16())
-            if binID > 0 { image = HwpDocument.ImageFill(binID: binID, code: code, effect: effect) }
+            if binID > 0 {
+                image = HwpDocument.ImageFill(binID: binID, code: code, effect: effect)
+            }
         }
         return (color, image)
     }
@@ -183,7 +204,6 @@ struct HwpBinaryReader {
         shape.alignment = .init(code: Int(flags >> 2 & 7))
         shape.pageBreakBefore = flags & 1 << 19 != 0
         // Margins, indent and spacing are stored at twice their HWPUNIT size
-        // (checked against the line positions Hangul saves).
         shape.left = Int(reader.int32()) / 2
         shape.right = Int(reader.int32()) / 2
         shape.indent = Int(reader.int32()) / 2
@@ -224,8 +244,10 @@ struct HwpBinaryReader {
         let count = Int(reader.int32())
         var tabDef = HwpDocument.TabDef(hangingStop: flags & 1 != 0, rightEndStop: flags & 2 != 0)
         tabDef.stops = (0..<max(count, 0)).compactMap { _ in
-            guard reader.remaining >= 8 else { return nil }
-            // Stored at twice their HWPUNIT size, like paragraph margins.
+            guard reader.remaining >= 8 else {
+                return nil
+            }
+            
             let position = Int(reader.int32()) / 2
             let kind = reader.uint8()
             let leader = reader.uint8()
@@ -270,7 +292,6 @@ struct HwpBinaryReader {
     }
 
     // MARK: Body
-
     private func readSection(_ nodes: [RecordNode]) -> HwpDocument.Section {
         var section = HwpDocument.Section()
         section.paragraphs = paragraphs(in: nodes[...], section: &section)
@@ -302,7 +323,8 @@ struct HwpBinaryReader {
         var controls: [RecordNode] = []
         for child in node.children {
             switch child.record.tag {
-            case HwpTag.paraText: text = child.record.payload
+            case HwpTag.paraText:
+                text = child.record.payload
             case HwpTag.paraCharShape:
                 var reader = ByteReader(child.record.payload)
                 while reader.remaining >= 8 {
@@ -323,8 +345,10 @@ struct HwpBinaryReader {
                         flags: reader.uint32()
                     ))
                 }
-            case HwpTag.ctrlHeader: controls.append(child)
-            default: break
+            case HwpTag.ctrlHeader:
+                controls.append(child)
+            default:
+                break
             }
         }
 
@@ -336,12 +360,16 @@ struct HwpBinaryReader {
         var pendingText = ""
         var pendingShape = charShape(at: 0)
         func flush() {
-            if !pendingText.isEmpty { paragraph.content.append(.text(pendingText, charShapeID: pendingShape)) }
+            if !pendingText.isEmpty {
+                paragraph.content.append(.text(pendingText, charShapeID: pendingShape))
+            }
             pendingText = ""
         }
         func append(_ string: String, at position: Int) {
             let shape = charShape(at: position)
-            if shape != pendingShape { flush() }
+            if shape != pendingShape {
+                flush()
+            }
             pendingShape = shape
             pendingText += string
         }
@@ -367,10 +395,14 @@ struct HwpBinaryReader {
                 flush()
                 paragraph.content.append(.tab(charShapeID: charShape(at: position)))
                 position += 8
-            case 24: append("-", at: position); position += 1
-            case 30: append("\u{00A0}", at: position); position += 1
-            case 31: append("\u{2007}", at: position); position += 1
-            case 0, 25...29: position += 1
+            case 24:
+                append("-", at: position); position += 1
+            case 30:
+                append("\u{00A0}", at: position); position += 1
+            case 31:
+                append("\u{2007}", at: position); position += 1
+            case 0, 25...29:
+                position += 1
             case 4:
                 flush()
                 paragraph.content.append(.control(.fieldEnd))
@@ -385,7 +417,6 @@ struct HwpBinaryReader {
                 }
                 position += 8
             default:
-                // Surrogate pairs arrive as two units; decode runs of plain text together.
                 units.removeAll(keepingCapacity: true)
                 var end = position
                 while end * 2 + 1 < text.count, text.uint16(at: end * 2) >= 32, charShape(at: end) == charShape(at: position),
@@ -442,7 +473,9 @@ struct HwpBinaryReader {
                 page.footer = Int(reader.uint32())
                 page.gutter = Int(reader.uint32())
                 page.landscape = reader.uint32() & 1 != 0
-                if page.landscape, page.width < page.height { swap(&page.width, &page.height) }
+                if page.landscape, page.width < page.height {
+                    swap(&page.width, &page.height)
+                }
                 section.page = page
             }
             return nil
@@ -456,7 +489,9 @@ struct HwpBinaryReader {
         case "gso ":
             return shapeObject(node, layout: Self.objectLayout(payload))
         case "eqed":
-            guard let record = node.children.first(where: { $0.record.tag == HwpTag.eqEdit }) else { return nil }
+            guard let record = node.children.first(where: { $0.record.tag == HwpTag.eqEdit }) else {
+                return nil
+            }
             var reader = ByteReader(record.record.payload)
             _ = reader.uint32()
             let script = reader.string()
@@ -509,7 +544,6 @@ struct HwpBinaryReader {
             var reader = ByteReader(payload)
             reader.skip(9)
             let command = reader.string()
-            // "http\://example.com;1;0;0;": escaped colons, then options.
             let target = command.split(separator: ";", omittingEmptySubsequences: false).first
                 .map { $0.replacingOccurrences(of: "\\:", with: ":") } ?? ""
             return .hyperlink(target)
@@ -526,7 +560,9 @@ struct HwpBinaryReader {
 
     /// A shape component's 2×3 matrix: x' = a·x + b·y + c, y' = d·x + e·y + f.
     static func matrix(_ payload: Data, at offset: Int) -> CGAffineTransform {
-        guard offset + 48 <= payload.count else { return .identity }
+        guard offset + 48 <= payload.count else {
+            return .identity
+        }
         let value = { payload.double(at: offset + $0 * 8) }
         return CGAffineTransform(a: value(0), b: value(3), c: value(1), d: value(4), tx: value(2), ty: value(5))
     }
@@ -557,7 +593,9 @@ struct HwpBinaryReader {
         var table = HwpDocument.Table()
         table.layout = Self.objectLayout(node.record.payload)
         let children = node.children
-        guard let record = children.first(where: { $0.record.tag == HwpTag.table }) else { return nil }
+        guard let record = children.first(where: { $0.record.tag == HwpTag.table }) else {
+            return nil
+        }
         var reader = ByteReader(record.record.payload)
         let flags = reader.uint32()
         table.repeatHeader = flags & 4 != 0
@@ -570,8 +608,12 @@ struct HwpBinaryReader {
 
         var index = children.startIndex
         while index < children.endIndex {
-            defer { index += 1 }
-            guard children[index].record.tag == HwpTag.listHeader else { continue }
+            defer {
+                index += 1
+            }
+            guard children[index].record.tag == HwpTag.listHeader else {
+                continue
+            }
             let header = children[index].record.payload
             let count = Int(header.uint16(at: 0))
             var cell = HwpDocument.Table.Cell()
@@ -594,7 +636,9 @@ struct HwpBinaryReader {
 
     /// A 'gso ' drawing object: its SHAPE_COMPONENT says what it is.
     private func shapeObject(_ node: RecordNode, layout: HwpDocument.ObjectLayout) -> HwpDocument.Control? {
-        guard let component = node.children.first(where: { $0.record.tag == HwpTag.shapeComponent }) else { return nil }
+        guard let component = node.children.first(where: { $0.record.tag == HwpTag.shapeComponent }) else {
+            return nil
+        }
         return shapeComponent(component, layout: layout, topLevel: true, parent: (0, 0))
     }
 
@@ -607,17 +651,13 @@ struct HwpBinaryReader {
         parent: (x: Int, y: Int)
     ) -> HwpDocument.Control? {
         let payload = node.record.payload
-        // Top-level components repeat the control id.
         let base = topLevel ? 8 : 4
         let kind = Self.controlID(payload)
         let matrixCount = Int(payload.uint16(at: base + 42))
         var layout = layout
         var corner = (x: 0, y: 0)
         if !topLevel {
-            // A grouped component is placed by its matrices, which map its own box into the top
-            // group's space: the translation, then each group's scale and rotation, outermost first.
             let size = (width: Double(payload.uint32(at: base + 12)), height: Double(payload.uint32(at: base + 16)))
-            // T · S0 · R0 · S1 · R1 …, applied right to left.
             var transform = CGAffineTransform.identity
             for index in (0..<matrixCount).reversed() {
                 transform = transform
@@ -633,7 +673,7 @@ struct HwpBinaryReader {
             layout.width = Int(box.width.rounded())
             layout.height = Int(box.height.rounded())
         }
-        // Line and fill information follow the transformation matrices.
+        
         var reader = ByteReader(payload)
         reader.skip(base + 44 + 48 + matrixCount * 96)
         let lineColor = reader.uint32()
@@ -653,13 +693,14 @@ struct HwpBinaryReader {
 
         switch kind {
         case "$pic":
-            guard let picture = node.children.first(where: { $0.record.tag == HwpTag.shapeComponentPicture }) else { return nil }
+            guard let picture = node.children.first(where: { $0.record.tag == HwpTag.shapeComponentPicture }) else {
+                return nil
+            }
             let data = picture.record.payload
             var result = HwpDocument.Picture()
             result.layout = layout
             result.binID = Int(data.uint16(at: 71))
             result.crop = (Int(data.int32(at: 44)), Int(data.int32(at: 48)), Int(data.int32(at: 52)), Int(data.int32(at: 56)))
-            // The image rectangle's corners: x, y for top left, top right, bottom right, bottom left.
             result.extent = (Int(data.int32(at: 28)), Int(data.int32(at: 32)))
             result.effect = HwpDocument.Picture.Effect(code: data.count > 70 ? Int(data[data.startIndex + 70]) : 0)
             result.border = line
@@ -734,21 +775,27 @@ struct ByteReader {
     mutating func skip(_ count: Int) { offset += count }
 
     mutating func uint8() -> UInt8 {
-        defer { offset += 1 }
+        defer {
+            offset += 1
+        }
         return offset < data.count ? data[data.startIndex + offset] : 0
     }
 
     mutating func int8() -> Int8 { Int8(bitPattern: uint8()) }
 
     mutating func uint16() -> UInt16 {
-        defer { offset += 2 }
+        defer {
+            offset += 2
+        }
         return data.uint16(at: offset)
     }
 
     mutating func int16() -> Int16 { Int16(bitPattern: uint16()) }
 
     mutating func uint32() -> UInt32 {
-        defer { offset += 4 }
+        defer {
+            offset += 4
+        }
         return data.uint32(at: offset)
     }
 

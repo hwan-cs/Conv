@@ -2,7 +2,6 @@
 import Foundation
 
 /// Video and audio through AVFoundation: rewrapping or re-encoding video, and audio to AAC or PCM.
-/// MP3 needs an encoder macOS doesn't have; `MP3Encoder` provides it. `GIFEncoder` makes GIFs.
 public struct MediaConverter: Sendable {
     public enum ConversionError: Error, Equatable {
         case unreadable
@@ -19,22 +18,30 @@ public struct MediaConverter: Sendable {
     /// - Parameter progress: Called with 0…1 as the conversion goes.
     public func convert(_ input: URL, to output: URL, progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
         let asset = AVURLAsset(url: input)
-        guard (try? await asset.load(.isReadable)) == true else { throw ConversionError.unreadable }
+        guard (try? await asset.load(.isReadable)) == true else {
+            throw ConversionError.unreadable
+        }
         try? FileManager.default.removeItem(at: output)
         switch output.pathExtension.lowercased() {
-        case "mp4", "m4v": try await exportVideo(asset, to: output, as: .mp4, progress: progress)
-        case "mov": try await exportVideo(asset, to: output, as: .mov, progress: progress)
-        case "m4a": try await export(asset, preset: AVAssetExportPresetAppleM4A, to: output, as: .m4a, progress: progress)
-        case "wav": try await writePCM(asset, to: output, bigEndian: false, progress: progress)
-        case "aiff", "aif": try await writePCM(asset, to: output, bigEndian: true, progress: progress)
-        case "mp3": try await MP3Encoder().encode(asset, to: output, progress: progress)
-        case "gif": try await GIFEncoder().encode(asset, to: output, progress: progress)
-        case let ext: throw ConversionError.unsupportedOutput(ext)
+        case "mp4", "m4v":
+            try await exportVideo(asset, to: output, as: .mp4, progress: progress)
+        case "mov":
+            try await exportVideo(asset, to: output, as: .mov, progress: progress)
+        case "m4a":
+            try await export(asset, preset: AVAssetExportPresetAppleM4A, to: output, as: .m4a, progress: progress)
+        case "wav":
+            try await writePCM(asset, to: output, bigEndian: false, progress: progress)
+        case "aiff", "aif":
+            try await writePCM(asset, to: output, bigEndian: true, progress: progress)
+        case "mp3":
+            try await MP3Encoder().encode(asset, to: output, progress: progress)
+        case "gif":
+            try await GIFEncoder().encode(asset, to: output, progress: progress)
+        case let ext:
+            throw ConversionError.unsupportedOutput(ext)
         }
     }
 
-    /// Rewraps the streams as they are when the new container takes them (a MOV of H.264 or HEVC
-    /// becomes an MP4 in seconds, without quality loss), and re-encodes otherwise.
     private func exportVideo(_ asset: AVURLAsset, to output: URL, as type: AVFileType, progress: @escaping @Sendable (Double) -> Void) async throws {
         if await AVAssetExportSession.compatibility(ofExportPreset: AVAssetExportPresetPassthrough, with: asset, outputFileType: type) {
             do {
@@ -54,16 +61,16 @@ public struct MediaConverter: Sendable {
         as type: AVFileType,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
-        if type == .m4a, try await asset.loadTracks(withMediaType: .audio).isEmpty { throw ConversionError.noAudio }
+        if type == .m4a, try await asset.loadTracks(withMediaType: .audio).isEmpty {
+            throw ConversionError.noAudio
+        }
         guard let session = AVAssetExportSession(asset: asset, presetName: preset) else {
             throw ConversionError.exportFailed(preset)
         }
         session.shouldOptimizeForNetworkUse = true
         session.outputURL = output
         session.outputFileType = type
-        // The async export(to:as:) is macOS 15; this runs on the 14 the app supports.
         let box = SessionBox(session)
-        // The session only offers its progress to poll.
         let polling = Task {
             while !Task.isCancelled {
                 progress(Double(box.session.progress))
@@ -128,25 +135,38 @@ enum PCMReader {
             AVNumberOfChannelsKey: format.channelCount,
         ])
         reader.add(output)
-        guard reader.startReading() else { throw MediaConverter.ConversionError.unreadable }
+        guard reader.startReading() else {
+            throw MediaConverter.ConversionError.unreadable
+        }
         let sink = try makeSink(format)
         while let sample = output.copyNextSampleBuffer() {
             let frames = AVAudioFrameCount(CMSampleBufferGetNumSamples(sample))
-            guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else { continue }
+            guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else {
+                continue
+            }
             buffer.frameLength = frames
             let status = CMSampleBufferCopyPCMDataIntoAudioBufferList(
                 sample, at: 0, frameCount: Int32(frames), into: buffer.mutableAudioBufferList
             )
-            guard status == noErr else { throw MediaConverter.ConversionError.unreadable }
+            guard status == noErr else {
+                throw MediaConverter.ConversionError.unreadable
+            }
             try sink(buffer)
-            if duration > 0 { progress(CMSampleBufferGetPresentationTimeStamp(sample).seconds / duration) }
+            if duration > 0 {
+                progress(CMSampleBufferGetPresentationTimeStamp(sample).seconds / duration)
+            }
         }
-        if reader.status == .failed { throw MediaConverter.ConversionError.exportFailed(reader.error?.localizedDescription ?? "") }
+        if reader.status == .failed {
+            throw MediaConverter.ConversionError.exportFailed(reader.error?.localizedDescription ?? "")
+        }
     }
 }
 
 /// AVAssetExportSession is safe to finish from its own completion queue.
 private final class SessionBox: @unchecked Sendable {
     let session: AVAssetExportSession
-    init(_ session: AVAssetExportSession) { self.session = session }
+    
+    init(_ session: AVAssetExportSession) {
+        self.session = session
+    }
 }

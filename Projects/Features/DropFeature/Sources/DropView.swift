@@ -11,9 +11,9 @@ public struct DropView: View {
     private let inbox = ConversionInbox.shared
     @State private var isTargeted = false
     @State private var isImporting = false
-
+    
     public init() {}
-
+    
     public var body: some View {
         content
             .padding(20)
@@ -24,17 +24,19 @@ public struct DropView: View {
                 return true
             }
             .fileImporter(isPresented: $isImporting, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-                if case .success(let urls) = result { model.accept(urls) }
+                if case .success(let urls) = result {
+                    model.accept(urls)
+                }
             }
             .background {
-                // ⌘O opens the panel from any screen but the one converting.
-                Button("파일 열기") { isImporting = true }
-                    .keyboardShortcut("o")
-                    .disabled(model.phase == .converting)
-                    .hidden()
+                Button("파일 열기") {
+                    isImporting = true
+                }
+                .keyboardShortcut("o")
+                .disabled(model.phase == .converting)
+                .hidden()
             }
             .toolbar {
-                // Where Mac apps keep it: top right of the window, beside ⌘, in the app menu.
                 ToolbarItem(placement: .primaryAction) {
                     SettingsLink {
                         Label("설정", systemImage: "gearshape")
@@ -44,44 +46,61 @@ public struct DropView: View {
             }
             .animation(ConvMotion.dragEnter, value: isTargeted)
             .onAppear(perform: takeDelivery)
-            .onChange(of: inbox.delivery) { takeDelivery() }
+            .onChange(of: inbox.delivery) {
+                takeDelivery()
+            }
     }
-
+    
     private func takeDelivery() {
-        guard model.phase != .converting, let delivery = inbox.take() else { return }
+        guard model.phase != .converting, let delivery = inbox.take() else {
+            return
+        }
         if delivery.needsFolderAccess {
             model.explainFolderAccess(for: delivery.urls)
             return
         }
         model.accept(delivery.urls, isPasted: delivery.isPasted, format: delivery.format)
     }
-
+    
     @ViewBuilder
     private var content: some View {
         if isTargeted && model.phase != .converting {
             DragOverScreen()
         } else {
             switch model.phase {
-            case .empty: EmptyScreen(notice: model.notice, offersSettings: model.noticeNeedsFolderAccess) { isImporting = true }
-            case .picking: PickScreen(model: model)
-            case .converting: ConvertingScreen(model: model)
-            case .done: DoneScreen(model: model)
+            case .empty:
+                EmptyScreen(
+                    notice: model.notice,
+                    offersSettings: model.noticeNeedsFolderAccess
+                ) {
+                    isImporting = true
+                }
+            case .picking:
+                PickScreen(model: model)
+            case .converting:
+                ConvertingScreen(model: model)
+            case .done:
+                DoneScreen(model: model)
             }
         }
     }
-
+    
     private func loadURLs(from providers: [NSItemProvider]) {
         let group = DispatchGroup()
         let collected = URLCollector()
         for provider in providers {
             group.enter()
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                if let url { collected.append(url) }
+                if let url {
+                    collected.append(url)
+                }
                 group.leave()
             }
         }
         group.notify(queue: .main) {
-            MainActor.assumeIsolated { model.accept(collected.urls) }
+            MainActor.assumeIsolated {
+                model.accept(collected.urls)
+            }
         }
     }
 }
@@ -89,19 +108,22 @@ public struct DropView: View {
 private final class URLCollector: @unchecked Sendable {
     private let lock = NSLock()
     private var collected: [URL] = []
-
-    func append(_ url: URL) { lock.withLock { collected.append(url) } }
+    
+    func append(_ url: URL) {
+        lock.withLock {
+            collected.append(url)
+        }
+    }
     var urls: [URL] { lock.withLock { collected } }
 }
 
 // MARK: Screens
-
 private struct EmptyScreen: View {
     let notice: String?
     var offersSettings = false
     let open: () -> Void
     @Environment(\.openSettings) private var openSettings
-
+    
     var body: some View {
         VStack(spacing: 14) {
             Button(action: open) {
@@ -123,6 +145,7 @@ private struct EmptyScreen: View {
                     }
             }
             .buttonStyle(.plain)
+            
             if let notice {
                 HStack(spacing: 12) {
                     Text(notice)
@@ -161,10 +184,10 @@ private struct PickScreen: View {
     let model: DropModel
     /// Picking a format only selects it; converting waits for the confirmation below.
     @State private var selected: Formats.Output?
-
+    
     private var primaries: [Formats.Output] { model.outputs.filter(\.isPrimary) }
     private var others: [Formats.Output] { model.outputs.filter { !$0.isPrimary } }
-
+    
     var body: some View {
         VStack(spacing: 16) {
             HStack(alignment: .center, spacing: 28) {
@@ -219,15 +242,24 @@ private struct PickScreen: View {
             }
             .frame(maxHeight: .infinity)
             ConfirmBar(model: model, selected: selected) {
-                if let selected { model.choose(selected) }
+                if let selected {
+                    model.choose(selected)
+                }
             } cancel: {
-                // Esc first drops the selection, then leaves the screen.
-                if selected != nil { selected = nil } else { model.reset() }
+                if selected != nil {
+                    selected = nil
+                } else {
+                    model.reset()
+                }
             }
         }
         .animation(ConvMotion.keyPress, value: selected)
-        .onAppear { selected = model.suggested }
-        .onChange(of: model.suggested) { selected = model.suggested }
+        .onAppear {
+            selected = model.suggested
+        }
+        .onChange(of: model.suggested) {
+            selected = model.suggested
+        }
     }
 }
 
@@ -237,7 +269,7 @@ private struct ConfirmBar: View {
     let selected: Formats.Output?
     let confirm: () -> Void
     let cancel: () -> Void
-
+    
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
@@ -281,20 +313,25 @@ private struct ConfirmBar: View {
         .background(RoundedRectangle(cornerRadius: 14).fill(selected == nil ? ConvColor.paper2 : ConvColor.white))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(selected == nil ? ConvColor.line : ConvColor.ink, lineWidth: 1.5))
     }
-
+    
     private var subject: String {
-        guard let first = model.items.first else { return "" }
+        guard let first = model.items.first else {
+            return ""
+        }
         return model.items.count == 1 ? first.name : "\(model.items.count)개 파일"
     }
-
+    
     private var question: String {
-        guard let selected else { return "바꿀 형식을 고르세요" }
-        // File names end in Latin letters, so the sentence avoids a particle after them.
+        guard let selected else {
+            return "바꿀 형식을 고르세요"
+        }
         return "\(subject) → \(StickerStyle.label(for: selected.ext)), 이대로 바꿀까요?"
     }
-
+    
     private var detail: String {
-        guard let selected else { return "숫자 키나 클릭으로 고른 뒤, 한 번 더 확인해요." }
+        guard let selected else {
+            return "숫자 키나 클릭으로 고른 뒤, 한 번 더 확인해요."
+        }
         if selected.combines {
             let name = SiblingWriter.combinedName(of: model.items.map(\.url), extension: selected.ext).lastPathComponent
             return "원본은 그대로 두고, 첫 파일 옆에 저장돼요: \(name)"
@@ -313,12 +350,14 @@ private struct ConfirmBar: View {
 
 private struct FileCard: View {
     let items: [DropModel.Item]
-
+    
     private var title: String {
-        guard let first = items.first else { return "" }
+        guard let first = items.first else {
+            return ""
+        }
         return items.count == 1 ? first.name : "\(first.name) 외 \(items.count - 1)개"
     }
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             ZStack(alignment: .topLeading) {
@@ -343,7 +382,7 @@ private struct FileCard: View {
                         .offset(x: 8, y: 10)
                 }
             }
-            // The card can be drawn once more while the model empties on cancel.
+            
             Text(title)
                 .font(ConvFont.mono(12, .bold))
                 .foregroundStyle(ConvColor.ink)
@@ -363,7 +402,7 @@ private struct FileCard: View {
 
 private struct ConvertingScreen: View {
     let model: DropModel
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -375,7 +414,9 @@ private struct ConvertingScreen: View {
                     .font(ConvFont.mono(13, .bold))
             }
             .foregroundStyle(ConvColor.ink)
+            
             ProgressBar(value: model.overallProgress)
+            
             ScrollView {
                 VStack(spacing: 10) {
                     ForEach(model.items) { item in
@@ -389,7 +430,7 @@ private struct ConvertingScreen: View {
 
 private struct ProgressBar: View {
     let value: Double
-
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
@@ -406,7 +447,7 @@ private struct ProgressBar: View {
 private struct ConversionRow: View {
     let item: DropModel.Item
     let output: String
-
+    
     var body: some View {
         HStack(spacing: 10) {
             FormatSticker(item.ext, size: .mini)
@@ -425,11 +466,11 @@ private struct ConversionRow: View {
         .background(RoundedRectangle(cornerRadius: 12).fill(isFailed ? ConvColor.errorFill : ConvColor.white))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(isFailed ? ConvColor.errorText : ConvColor.line, lineWidth: 1.5))
     }
-
+    
     private var isFailed: Bool {
         if case .failed = item.status { true } else { false }
     }
-
+    
     @ViewBuilder
     private var status: some View {
         switch item.status {
@@ -459,13 +500,17 @@ private struct ConversionRow: View {
 
 private struct DoneScreen: View {
     let model: DropModel
-
+    
     private var headline: String {
-        guard model.finishedCount > 0 else { return "바꾸지 못했어요" }
-        if model.output?.combines == true { return "\(model.items.count)개를 PDF 하나로 합쳤어요" }
+        guard model.finishedCount > 0 else {
+            return "바꾸지 못했어요"
+        }
+        if model.output?.combines == true {
+            return "\(model.items.count)개를 PDF 하나로 합쳤어요"
+        }
         return "\(model.finishedCount)개 바꿨어요"
     }
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top) {
@@ -488,7 +533,6 @@ private struct DoneScreen: View {
                     Text(model.items.contains(where: \.isPasted) ? "고른 곳에 저장했어요." : model.output?.combines == true ? "원본은 그대로 두고, 합친 파일을 저장했어요." : "원본은 그대로 두고, 바뀐 파일은 원본 옆에 놓았어요.")
                 }
                 if model.output?.combines == true {
-                    // One failure shared by every file.
                     if case .failed(let message) = model.failedItems.first?.status {
                         Text(message).foregroundStyle(ConvColor.errorText)
                     }
@@ -502,6 +546,7 @@ private struct DoneScreen: View {
             }
             .font(ConvFont.sans(13))
             .foregroundStyle(ConvColor.muted)
+            
             HStack(spacing: 10) {
                 if model.finishedCount > 0 {
                     Button {

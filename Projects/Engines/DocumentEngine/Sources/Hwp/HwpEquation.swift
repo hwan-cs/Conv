@@ -19,10 +19,8 @@ enum HwpEquation {
     }
 
     // MARK: Tokens
-
     enum Token: Equatable {
         case open, close, raise, lower, column, row, space, thinSpace
-        /// Whitespace: it only separates words, except that it ends an unbraced limit (`lim_h->0 f`).
         case gap
         case word(String)
         case number(String)
@@ -37,29 +35,45 @@ enum HwpEquation {
         while index < characters.count {
             let character = characters[index]
             switch character {
-            case "{": tokens.append(.open)
-            case "}": tokens.append(.close)
-            case "^": tokens.append(.raise)
-            case "_": tokens.append(.lower)
-            case "&": tokens.append(.column)
-            case "#": tokens.append(.row)
-            case "~": tokens.append(.space)
-            case "`": tokens.append(.thinSpace)
+            case "{":
+                tokens.append(.open)
+            case "}":
+                tokens.append(.close)
+            case "^":
+                tokens.append(.raise)
+            case "_":
+                tokens.append(.lower)
+            case "&":
+                tokens.append(.column)
+            case "#":
+                tokens.append(.row)
+            case "~":
+                tokens.append(.space)
+            case "`":
+                tokens.append(.thinSpace)
             case "\"":
                 var end = index + 1
-                while end < characters.count, characters[end] != "\"" { end += 1 }
+                while end < characters.count, characters[end] != "\"" {
+                    end += 1
+                }
                 tokens.append(.text(String(characters[(index + 1)..<min(end, characters.count)])))
                 index = end
             case _ where character.isWhitespace:
-                if tokens.last != .gap { tokens.append(.gap) }
+                if tokens.last != .gap {
+                    tokens.append(.gap)
+                }
             case _ where character.isASCII && character.isLetter:
                 var end = index
-                while end < characters.count, characters[end].isASCII, characters[end].isLetter { end += 1 }
+                while end < characters.count, characters[end].isASCII, characters[end].isLetter {
+                    end += 1
+                }
                 tokens.append(.word(String(characters[index..<end])))
                 index = end - 1
             case _ where character.isNumber && character.isASCII:
                 var end = index
-                while end < characters.count, characters[end].isASCII, characters[end].isNumber || characters[end] == "." { end += 1 }
+                while end < characters.count, characters[end].isASCII, characters[end].isNumber || characters[end] == "." {
+                    end += 1
+                }
                 tokens.append(.number(String(characters[index..<end])))
                 index = end - 1
             case "-" where index + 1 < characters.count && characters[index + 1] == ">":
@@ -85,7 +99,6 @@ enum HwpEquation {
     }
 
     // MARK: Tree
-
     indirect enum Node {
         case identifier(String, upright: Bool)
         case number(String)
@@ -114,12 +127,16 @@ enum HwpEquation {
         var peek: Token? { index < tokens.count ? tokens[index] : nil }
 
         mutating func next() -> Token? {
-            defer { index += 1 }
+            defer {
+                index += 1
+            }
             return peek
         }
 
         mutating func skipGaps() {
-            while peek == .gap { index += 1 }
+            while peek == .gap {
+                index += 1
+            }
         }
 
         /// Top-level lines, split at `#`.
@@ -127,8 +144,12 @@ enum HwpEquation {
             var rows: [[Node]] = []
             while index < tokens.count {
                 rows.append(sequence(until: [.row]))
-                if peek == .row { index += 1 }
-                if peek == .close { index += 1 }
+                if peek == .row {
+                    index += 1
+                }
+                if peek == .close {
+                    index += 1
+                }
             }
             return rows.filter { !$0.isEmpty }
         }
@@ -136,16 +157,25 @@ enum HwpEquation {
         /// Items up to a closing brace or one of `stops`, with `over` and `atop` binding their neighbours.
         mutating func sequence(until stops: Set<StopToken> = [], words: Set<String> = []) -> [Node] {
             var nodes: [Node] = []
-            // Where the chunk since the last whitespace starts.
             var chunkStart = 0
             var afterGap = false
             while true {
-                if peek == .gap { afterGap = true }
+                if peek == .gap {
+                    afterGap = true
+                }
                 skipGaps()
-                guard let token = peek else { break }
-                if token == .close { break }
-                if let stop = StopToken(token), stops.contains(stop) { break }
-                if case .word(let word) = token, words.contains(word.lowercased()) { break }
+                guard let token = peek else {
+                    break
+                }
+                if token == .close {
+                    break
+                }
+                if let stop = StopToken(token), stops.contains(stop) {
+                    break
+                }
+                if case .word(let word) = token, words.contains(word.lowercased()) {
+                    break
+                }
                 if case .word(let word) = token, ["over", "atop"].contains(word.lowercased()) {
                     index += 1
                     let start = min(chunkStart, nodes.count)
@@ -157,10 +187,13 @@ enum HwpEquation {
                     afterGap = false
                     continue
                 }
-                if afterGap { chunkStart = nodes.count }
+                if afterGap {
+                    chunkStart = nodes.count
+                }
                 afterGap = false
-                // A token that is no item (a stray `#` or `^`) is dropped.
-                guard let node = atom() else { continue }
+                guard let node = atom() else {
+                    continue
+                }
                 nodes.append(scripts(on: node))
             }
             return nodes
@@ -169,11 +202,17 @@ enum HwpEquation {
         /// A braced group, or the items up to the next whitespace.
         mutating func chunk() -> Node {
             skipGaps()
-            if peek == .open, let group = atom() { return scripts(on: group) }
+            if peek == .open, let group = atom() {
+                return scripts(on: group)
+            }
             var nodes: [Node] = []
             while let token = peek, ![.gap, .close, .column, .row].contains(token) {
-                if case .word(let word) = token, ["over", "atop", "of", "right"].contains(word.lowercased()) { break }
-                guard let node = atom() else { break }
+                if case .word(let word) = token, ["over", "atop", "of", "right"].contains(word.lowercased()) {
+                    break
+                }
+                guard let node = atom() else {
+                    break
+                }
                 nodes.append(scripts(on: node))
             }
             return nodes.count == 1 ? nodes[0] : .row(nodes)
@@ -184,12 +223,19 @@ enum HwpEquation {
             var sub: Node?
             var sup: Node?
             var limits = false
-            if case .operation(let op) = base, ["∑", "∏", "∐", "⋂", "⋃"].contains(op) { limits = true }
-            if case .identifier(let name, true) = base, ["lim", "max", "min", "sup", "inf"].contains(name) { limits = true }
+            if case .operation(let op) = base, ["∑", "∏", "∐", "⋂", "⋃"].contains(op) {
+                limits = true
+            }
+            if case .identifier(let name, true) = base, ["lim", "max", "min", "sup", "inf"].contains(name) {
+                limits = true
+            }
             loop: while true {
                 let mark = index
                 skipGaps()
-                guard let token = peek else { index = mark; break }
+                guard let token = peek else {
+                    index = mark
+                    break
+                }
                 switch token {
                 case .lower:
                     index += 1
@@ -216,17 +262,23 @@ enum HwpEquation {
                     break loop
                 }
             }
-            guard sub != nil || sup != nil else { return base }
+            guard sub != nil || sup != nil else {
+                return base
+            }
             return .scripts(base, sub: sub, sup: sup, limits: limits)
         }
 
         /// A braced group, or like `over`'s operands everything up to the next space: `f_n+1`, `lim_h->0`.
         mutating func scriptArgument() -> Node? {
             skipGaps()
-            if peek == .open { return atom() }
+            if peek == .open {
+                return atom()
+            }
             var nodes: [Node] = []
             while let token = peek, ![.open, .close, .raise, .lower, .gap].contains(token) {
-                guard let node = atom() else { break }
+                guard let node = atom() else {
+                    break
+                }
                 nodes.append(node)
             }
             return .row(nodes)
@@ -234,20 +286,30 @@ enum HwpEquation {
 
         mutating func atom() -> Node? {
             skipGaps()
-            guard let token = next() else { return nil }
+            guard let token = next() else {
+                return nil
+            }
             switch token {
             case .open:
                 let inner = sequence()
-                if peek == .close { index += 1 }
+                if peek == .close {
+                    index += 1
+                }
                 return .row(inner)
             case .close, .row, .column, .raise, .lower, .gap:
                 return nil
-            case .space: return .space(0.3)
-            case .thinSpace: return .space(0.1)
-            case .number(let value): return .number(value)
-            case .text(let value): return .text(value)
-            case .symbol(let value): return Self.operators.contains(value) ? .operation(value) : .identifier(value, upright: true)
-            case .word(let word): return keyword(word)
+            case .space:
+                return .space(0.3)
+            case .thinSpace:
+                return .space(0.1)
+            case .number(let value):
+                return .number(value)
+            case .text(let value):
+                return .text(value)
+            case .symbol(let value):
+                return Self.operators.contains(value) ? .operation(value) : .identifier(value, upright: true)
+            case .word(let word):
+                return keyword(word)
             }
         }
 
@@ -257,7 +319,6 @@ enum HwpEquation {
             case "sqrt":
                 return .root(chunk(), index: nil)
             case "root":
-                // `root 3 of x` has a degree; a plain `root x` is a square root.
                 let first = chunk()
                 let mark = index
                 skipGaps()
@@ -282,14 +343,21 @@ enum HwpEquation {
                 return nil
             case "matrix", "pmatrix", "bmatrix", "dmatrix", "cases", "eqalign":
                 let (open, close) = switch lower {
-                case "pmatrix": ("(", ")")
-                case "bmatrix": ("[", "]")
-                case "dmatrix": ("|", "|")
-                case "cases": ("{", "")
-                default: ("", "")
+                case "pmatrix":
+                    ("(", ")")
+                case "bmatrix":
+                    ("[", "]")
+                case "dmatrix":
+                    ("|", "|")
+                case "cases":
+                    ("{", "")
+                default:
+                    ("", "")
                 }
                 skipGaps()
-                guard peek == .open else { return nil }
+                guard peek == .open else {
+                    return nil
+                }
                 index += 1
                 var rows: [[Node]] = [[]]
                 var cell: [Node] = []
@@ -299,8 +367,9 @@ enum HwpEquation {
                         index += 1
                     case .column:
                         index += 1
-                        // `&&` is one column break.
-                        if peek == .column { index += 1 }
+                        if peek == .column {
+                            index += 1
+                        }
                         rows[rows.count - 1].append(.row(cell))
                         cell = []
                     case .row:
@@ -312,17 +381,20 @@ enum HwpEquation {
                         cell += sequence(until: [.column, .row])
                     }
                 }
-                if peek == .close { index += 1 }
+                if peek == .close {
+                    index += 1
+                }
                 rows[rows.count - 1].append(.row(cell))
                 return .matrix(rows, open: open, close: close)
             case "rm", "it", "bold":
-                // A font change lasts to the end of its group.
                 let rest = sequence(until: [.column, .row])
                 return .styled(.row(rest), upright: lower != "it", bold: lower == "bold")
             case "box":
                 // BOX{…} frames its argument; BOX alone is the □ symbol.
                 skipGaps()
-                if peek == .open { return .boxed(atom() ?? .row([])) }
+                if peek == .open {
+                    return .boxed(atom() ?? .row([]))
+                }
                 return .operation("□")
             default:
                 break
@@ -335,39 +407,52 @@ enum HwpEquation {
                     ? .operation(symbol)
                     : .identifier(symbol, upright: false)
             }
-            if Self.functions.contains(lower) { return .identifier(lower, upright: true) }
-            // Words run together: "rmP", "cosA", "barPH". Split off the longest known word in front.
+            if Self.functions.contains(lower) {
+                return .identifier(lower, upright: true)
+            }
+            
             if let prefix = Self.prefixes.first(where: { word.hasPrefix($0) && word.count > $0.count }) {
                 tokens.insert(.word(String(word.dropFirst(prefix.count))), at: index)
                 return keyword(prefix)
             }
-            // Hangul also finds capitalized keywords and `circ` inside words: "ACUPB" is A ∪ B.
+            
             let characters = Array(word)
             for start in 1..<max(characters.count, 1) {
                 let rest = String(characters[start...])
                 if let embedded = Self.embedded.first(where: { rest.hasPrefix($0) }) {
                     let after = String(characters[(start + embedded.count)...])
-                    if !after.isEmpty { tokens.insert(.word(after), at: index) }
+                    if !after.isEmpty {
+                        tokens.insert(.word(after), at: index)
+                    }
                     tokens.insert(.word(embedded), at: index)
                     return keyword(String(characters[..<start]))
                 }
             }
-            // Plain letters are separate variables.
-            if word.count == 1 { return .identifier(word, upright: false) }
+            
+            if word.count == 1 {
+                return .identifier(word, upright: false)
+            }
             return .row(word.map { .identifier(String($0), upright: false) })
         }
 
         mutating func delimiter() -> String {
             skipGaps()
-            guard let token = next() else { return "" }
+            guard let token = next() else {
+                return ""
+            }
             switch token {
-            case .symbol(let value): return value == "." ? "" : value
-            case .open: return "{"
-            case .close: return "}"
+            case .symbol(let value):
+                return value == "." ? "" : value
+            case .open: 
+                return "{"
+            case .close: 
+                return "}"
             case .word(let word):
                 let named = ["lbrace": "{", "rbrace": "}", "langle": "⟨", "rangle": "⟩",
                              "lceil": "⌈", "rceil": "⌉", "lfloor": "⌊", "rfloor": "⌋"]
-                if let delimiter = named[word.lowercased()] { return delimiter }
+                if let delimiter = named[word.lowercased()] {
+                    return delimiter
+                }
                 index -= 1
                 return ""
             default:
@@ -435,9 +520,12 @@ enum HwpEquation {
 
         init?(_ token: Token) {
             switch token {
-            case .column: self = .column
-            case .row: self = .row
-            default: return nil
+            case .column:
+                self = .column
+            case .row:
+                self = .row
+            default:
+                return nil
             }
         }
     }
@@ -457,7 +545,6 @@ enum HwpEquation {
             return "<mn>\(escape(value))</mn>"
         case .operation(let value):
             let large = ["∫", "∬", "∭", "∮", "∑", "∏", "∐", "⋂", "⋃"].contains(value) ? " largeop=\"true\"" : ""
-            // Brackets typed as plain characters keep their size; only left/right fences stretch.
             let fixed = ["(", ")", "[", "]", "|"].contains(value) ? " stretchy=\"false\"" : ""
             return "<mo\(large)\(fixed)>\(escape(value == "-" ? "−" : value))</mo>"
         case .text(let value):
@@ -469,15 +556,21 @@ enum HwpEquation {
         case .fraction(let numerator, let denominator, let line):
             return "<mfrac\(line ? "" : " linethickness=\"0\"")>\(render(numerator))\(render(denominator))</mfrac>"
         case .root(let radicand, let index):
-            if let index { return "<mroot>\(render(radicand))\(render(index))</mroot>" }
+            if let index {
+                return "<mroot>\(render(radicand))\(render(index))</mroot>"
+            }
             return "<msqrt>\(render(radicand))</msqrt>"
         case .scripts(let base, let sub, let sup, let limits):
             let (both, under, over) = limits ? ("munderover", "munder", "mover") : ("msubsup", "msub", "msup")
             switch (sub, sup) {
-            case let (sub?, sup?): return "<\(both)>\(render(base))\(render(sub))\(render(sup))</\(both)>"
-            case let (sub?, nil): return "<\(under)>\(render(base))\(render(sub))</\(under)>"
-            case let (nil, sup?): return "<\(over)>\(render(base))\(render(sup))</\(over)>"
-            default: return render(base)
+            case let (sub?, sup?): 
+                return "<\(both)>\(render(base))\(render(sub))\(render(sup))</\(both)>"
+            case let (sub?, nil): 
+                return "<\(under)>\(render(base))\(render(sub))</\(under)>"
+            case let (nil, sup?):
+                return "<\(over)>\(render(base))\(render(sup))</\(over)>"
+            default:
+                return render(base)
             }
         case .accent(let base, let mark, let over):
             let tag = over ? "mover" : "munder"
@@ -494,7 +587,6 @@ enum HwpEquation {
         case .boxed(let inner):
             return "<menclose notation=\"box\">\(render(inner))</menclose>"
         case .styled(let inner, let upright, let bold):
-            // MathML Core only honours mathvariant="normal" on <mi>, so the style goes to the letters.
             let html = render(restyled(inner, upright: upright))
             return bold ? "<mrow style=\"font-weight:bold\">\(html)</mrow>" : html
         }
@@ -502,12 +594,18 @@ enum HwpEquation {
 
     private static func restyled(_ node: Node, upright: Bool) -> Node {
         switch node {
-        case .identifier(let name, _): .identifier(name, upright: upright)
-        case .row(let nodes): .row(nodes.map { restyled($0, upright: upright) })
-        case .accent(let base, let mark, let over): .accent(restyled(base, upright: upright), mark, over: over)
-        case .fraction(let top, let bottom, let line): .fraction(restyled(top, upright: upright), restyled(bottom, upright: upright), line: line)
-        case .scripts(let base, let sub, let sup, let limits): .scripts(restyled(base, upright: upright), sub: sub, sup: sup, limits: limits)
-        default: node
+        case .identifier(let name, _):
+            return .identifier(name, upright: upright)
+        case .row(let nodes):
+            return .row(nodes.map { restyled($0, upright: upright) })
+        case .accent(let base, let mark, let over):
+            return .accent(restyled(base, upright: upright), mark, over: over)
+        case .fraction(let top, let bottom, let line):
+            return .fraction(restyled(top, upright: upright), restyled(bottom, upright: upright), line: line)
+        case .scripts(let base, let sub, let sup, let limits):
+            return .scripts(restyled(base, upright: upright), sub: sub, sup: sup, limits: limits)
+        default:
+            return node
         }
     }
 

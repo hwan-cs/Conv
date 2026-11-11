@@ -8,16 +8,17 @@ struct GIFEncoder {
     /// 10 frames a second. GIF times frames in hundredths of a second; each frame is stored whole,
     /// at about 60 KB for 480 × 270.
     var frameDelay = 0.1
-    /// The longer side, in pixels.
     var maxSide = 480
-    /// Thirty seconds at the full rate; longer videos get fewer frames a second rather than a
-    /// file too big to send.
     var maxFrames = 300
 
     func encode(_ asset: AVAsset, to output: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
-        guard try await !asset.loadTracks(withMediaType: .video).isEmpty else { throw MediaConverter.ConversionError.unreadable }
+        guard try await !asset.loadTracks(withMediaType: .video).isEmpty else {
+            throw MediaConverter.ConversionError.unreadable
+        }
         let duration = try await asset.load(.duration).seconds
-        guard duration.isFinite, duration > 0 else { throw MediaConverter.ConversionError.unreadable }
+        guard duration.isFinite, duration > 0 else {
+            throw MediaConverter.ConversionError.unreadable
+        }
         let delay = max(frameDelay, (duration / Double(maxFrames) * 100).rounded(.up) / 100)
         let count = max(Int(duration / delay), 1)
         let times = (0..<count).map { CMTime(seconds: Double($0) * delay, preferredTimescale: 600) }
@@ -37,12 +38,15 @@ struct GIFEncoder {
         let frame: [CFString: Any] = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: delay]]
         var added = 0
         for await result in generator.images(for: times) {
-            // A frame past the last one decodable is skipped, not fatal.
-            guard let image = try? result.image else { continue }
+            guard let image = try? result.image else {
+                continue
+            }
             CGImageDestinationAddImage(destination, image, frame as CFDictionary)
             added += 1
             progress(Double(added) / Double(count))
         }
-        guard added > 0, CGImageDestinationFinalize(destination) else { throw MediaConverter.ConversionError.exportFailed("GIF") }
+        guard added > 0, CGImageDestinationFinalize(destination) else {
+            throw MediaConverter.ConversionError.exportFailed("GIF")
+        }
     }
 }

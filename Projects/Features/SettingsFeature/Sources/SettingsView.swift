@@ -53,8 +53,10 @@ private struct LicenseSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text(license.name).font(.headline)
-                Text(license.license).foregroundStyle(.secondary)
+                Text(license.name)
+                    .font(.headline)
+                Text(license.license)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Link("웹사이트", destination: license.source)
             }
@@ -73,7 +75,10 @@ private struct LicenseSheet: View {
             .background(.background.secondary)
             HStack {
                 Spacer()
-                Button("닫기") { dismiss() }.keyboardShortcut(.defaultAction)
+                Button("닫기") {
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
             }
         }
         .padding(20)
@@ -81,7 +86,7 @@ private struct LicenseSheet: View {
     }
 }
 
-/// Finder's "conv.로 바꾸기": off until the user turns the extension on, and it works only in
+/// Finder's "conv로 바꾸기": off until the user turns the extension on, and it works only in
 /// folders allowed here, since a sandboxed app can't read files Finder merely names.
 private struct FinderMenuSection: View {
     @State private var access = FolderAccess.shared
@@ -113,7 +118,9 @@ private struct FinderMenuSection: View {
                 Text(access.folders.isEmpty ? "허용한 폴더가 없어요" : "다른 폴더도 허용할 수 있어요")
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("폴더 허용…") { access.grant() }
+                Button("폴더 허용...") {
+                    access.grant()
+                }
             }
         } header: {
             Text("Finder 우클릭 메뉴")
@@ -121,13 +128,12 @@ private struct FinderMenuSection: View {
             Text("""
             1. Finder 확장을 켜요. 시스템 설정에서 Conv를 체크하면 돼요.
             2. 바꿀 파일이 있는 폴더를 허용해요. 홈 폴더를 고르면 그 안 어디서든 쓸 수 있어요.
-            3. Finder에서 파일을 우클릭하고 "conv.로 바꾸기"에서 포맷을 골라요.
+            3. Finder에서 파일을 우클릭하고 "conv로 바꾸기"에서 포맷을 골라요.
             """)
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
-        // The switch lives in System Settings; check again on coming back.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             isEnabled = FIFinderSyncController.isExtensionEnabled
         }

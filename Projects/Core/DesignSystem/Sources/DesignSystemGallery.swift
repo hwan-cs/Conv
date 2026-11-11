@@ -7,10 +7,14 @@ struct DesignSystemGallery: View {
             section("STICKERS") {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(spacing: 12) {
-                        ForEach(["heic", "jpg", "png", "webp", "pdf"], id: \.self) { FormatSticker($0) }
+                        ForEach(["heic", "jpg", "png", "webp", "pdf"], id: \.self) {
+                            FormatSticker($0)
+                        }
                     }
                     HStack(spacing: 12) {
-                        ForEach(["docx", "hwp", "md", "mov", "mp4", "mp3"], id: \.self) { FormatSticker($0) }
+                        ForEach(["docx", "hwp", "md", "mov", "mp4", "mp3"], id: \.self) {
+                            FormatSticker($0)
+                        }
                     }
                     HStack(alignment: .center, spacing: 12) {
                         FormatSticker("heic", size: .mini)
@@ -27,9 +31,13 @@ struct DesignSystemGallery: View {
             }
             section("TYPE") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("3개 바꿨어요").font(ConvFont.sans(40, .heavy)).tracking(-1.5)
-                    Text("원본은 그대로 두고, 바뀐 파일은 원본 옆에.").font(ConvFont.sans(15))
-                    Text(".heic → .jpg").font(ConvFont.mono(22, .bold))
+                    Text("3개 바꿨어요")
+                        .font(ConvFont.sans(40, .heavy))
+                        .tracking(-1.5)
+                    Text("원본은 그대로 두고, 바뀐 파일은 원본 옆에.")
+                        .font(ConvFont.sans(15))
+                    Text(".heic → .jpg")
+                        .font(ConvFont.mono(22, .bold))
                 }
                 .foregroundStyle(ConvColor.ink)
             }

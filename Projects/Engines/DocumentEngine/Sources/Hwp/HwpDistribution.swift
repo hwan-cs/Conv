@@ -7,7 +7,9 @@ enum HwpDistribution {
     static func decrypt(_ stream: Data) throws -> Data {
         guard let record = try? HwpRecord.parse(stream.prefix(260)).first,
               record.tag == HwpTag.distributeDocData, record.payload.count == 256
-        else { throw HwpFile.HwpError.corrupt }
+        else {
+            throw HwpFile.HwpError.corrupt
+        }
 
         var data = [UInt8](record.payload)
         var random = MSVCRandom(seed: record.payload.uint32(at: 0))
@@ -33,7 +35,9 @@ enum HwpDistribution {
             body, body.count - body.count % kCCBlockSizeAES128,
             &output, output.count, &written
         )
-        guard status == kCCSuccess else { throw HwpFile.HwpError.corrupt }
+        guard status == kCCSuccess else {
+            throw HwpFile.HwpError.corrupt
+        }
         return Data(output.prefix(written))
     }
 }
@@ -41,7 +45,9 @@ enum HwpDistribution {
 private struct MSVCRandom {
     var state: UInt32
 
-    init(seed: UInt32) { state = seed }
+    init(seed: UInt32) {
+        state = seed
+    }
 
     mutating func next() -> UInt32 {
         state = state &* 214_013 &+ 2_531_011

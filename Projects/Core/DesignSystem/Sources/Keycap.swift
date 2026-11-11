@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// An output format choice drawn as a keyboard key. Pressing it (or its number key) sinks the cap;
-/// the selected choice is the yellow, raised one.
+/// An output format choice drawn as a keyboard key. 
 public struct Keycap: View {
     let ext: String
     let caption: String

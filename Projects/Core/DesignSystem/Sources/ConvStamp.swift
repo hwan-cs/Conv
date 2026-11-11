@@ -28,8 +28,12 @@ public struct ConvStamp: View {
         .scaleEffect(isLanded ? 1 : 1.3)
         .opacity(isLanded ? 1 : 0)
         .onAppear {
-            guard animated else { return }
-            withAnimation(ConvMotion.stamp) { landed = true }
+            guard animated else {
+                return
+            }
+            withAnimation(ConvMotion.stamp) {
+                landed = true
+            }
         }
         .accessibilityElement(children: .combine)
     }

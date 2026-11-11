@@ -25,14 +25,12 @@ struct HwpFile {
     let container: CompoundFile
     let version: Version
     let isCompressed: Bool
-    /// 배포용 문서: the body lives encrypted in ViewText instead of BodyText.
     let isDistribution: Bool
 
     init(url: URL) throws {
         do {
             container = try CompoundFile(url: url)
         } catch {
-            // HWP 3 and older are a flat file starting with this signature, not a compound file.
             let head = (try? FileHandle(forReadingFrom: url).read(upToCount: 23)) ?? nil
             if let head, String(decoding: head, as: UTF8.self).hasPrefix("HWP Document File V") {
                 throw HwpError.unsupportedVersion(String(decoding: head.suffix(4), as: UTF8.self))
@@ -41,12 +39,18 @@ struct HwpFile {
         }
         guard let header = try container.stream("FileHeader"), header.count >= 40,
               String(data: header.prefix(17), encoding: .ascii) == "HWP Document File"
-        else { throw HwpError.notAnHwp }
+        else {
+            throw HwpError.notAnHwp
+        }
         version = Version(raw: header.uint32(at: 32))
-        guard version.raw >> 24 == 5 else { throw HwpError.unsupportedVersion(version.description) }
+        guard version.raw >> 24 == 5 else {
+            throw HwpError.unsupportedVersion(version.description)
+        }
         let flags = header.uint32(at: 36)
         isCompressed = flags & 1 != 0
-        if flags & 2 != 0 { throw HwpError.passwordProtected }
+        if flags & 2 != 0 {
+            throw HwpError.passwordProtected
+        }
         isDistribution = flags & 4 != 0
     }
 
@@ -55,28 +59,37 @@ struct HwpFile {
     }
 
     func docInfo() throws -> [HwpRecord] {
-        guard let stream = try container.stream("DocInfo") else { throw HwpError.corrupt }
+        guard let stream = try container.stream("DocInfo") else {
+            throw HwpError.corrupt
+        }
         return try HwpRecord.parse(decompressed(stream))
     }
 
     func section(_ index: Int) throws -> [HwpRecord] {
         if isDistribution {
-            guard let stream = try container.stream("ViewText/Section\(index)") else { throw HwpError.corrupt }
+            guard let stream = try container.stream("ViewText/Section\(index)") else {
+                throw HwpError.corrupt
+            }
             return try HwpRecord.parse(decompressed(HwpDistribution.decrypt(stream)))
         }
-        guard let stream = try container.stream("BodyText/Section\(index)") else { throw HwpError.corrupt }
+        guard let stream = try container.stream("BodyText/Section\(index)") else {
+            throw HwpError.corrupt
+        }
         return try HwpRecord.parse(decompressed(stream))
     }
 
     /// An embedded file such as "BIN0001.png", decompressed when the document is.
     func binData(named name: String) throws -> Data? {
-        guard let stream = try container.stream("BinData/\(name)") else { return nil }
-        // Some writers store already-compressed images raw despite the flag.
+        guard let stream = try container.stream("BinData/\(name)") else {
+            return nil
+        }
         return (try? decompressed(stream)) ?? stream
     }
 
     private func decompressed(_ data: Data) throws -> Data {
-        guard isCompressed else { return data }
+        guard isCompressed else {
+            return data
+        }
         return try Self.inflate(data)
     }
 
@@ -86,13 +99,14 @@ struct HwpFile {
         let filter = try OutputFilter(.decompress, using: .zlib) { output.append($0 ?? Data()) }
         try filter.write(data)
         try filter.finalize()
-        guard !output.isEmpty || data.isEmpty else { throw HwpError.corrupt }
+        guard !output.isEmpty || data.isEmpty else {
+            throw HwpError.corrupt
+        }
         return output
     }
 }
 
-/// One tag/level/size record; DocInfo and each section are flat sequences of them,
-/// with nesting given by `level`.
+/// One tag/level/size record; DocInfo and each section are flat sequences of them. Nnesting given by `level`.
 struct HwpRecord {
     let tag: Int
     let level: Int
@@ -109,7 +123,9 @@ struct HwpRecord {
                 size = Int(data.uint32(at: offset))
                 offset += 4
             }
-            guard offset + size <= data.count else { throw HwpFile.HwpError.corrupt }
+            guard offset + size <= data.count else {
+                throw HwpFile.HwpError.corrupt
+            }
             let start = data.startIndex + offset
             records.append(HwpRecord(
                 tag: Int(header & 0x3FF),
@@ -124,7 +140,6 @@ struct HwpRecord {
 
 enum HwpTag {
     static let begin = 0x10
-    // DocInfo
     static let documentProperties = begin
     static let idMappings = begin + 1
     static let binData = begin + 2

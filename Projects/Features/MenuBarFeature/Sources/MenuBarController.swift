@@ -2,8 +2,7 @@ import AppKit
 import Observation
 import SwiftUI
 
-/// The menu bar item. A click opens the popover with paste, recent conversions and a way to the
-/// main window.
+/// The menu bar item. A click opens the popover with paste, recent conversions and a way to the main window.
 @MainActor
 public final class MenuBarController: NSObject {
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -11,7 +10,9 @@ public final class MenuBarController: NSObject {
 
     public override init() {
         super.init()
-        guard let button = item.button else { return }
+        guard let button = item.button else {
+            return
+        }
         button.image = NSImage(systemSymbolName: "arrow.down.to.line", accessibilityDescription: "Conv")
         button.target = self
         button.action = #selector(togglePopover)
@@ -30,9 +31,13 @@ public final class MenuBarController: NSObject {
         let progress = withObservationTracking {
             conversions.current.map { _ in conversions.progress }
         } onChange: {
-            Task { @MainActor [weak self] in self?.observeQuietConversions() }
+            Task { @MainActor [weak self] in
+                self?.observeQuietConversions()
+            }
         }
-        guard let button = item.button else { return }
+        guard let button = item.button else {
+            return
+        }
         if let progress {
             button.image = Self.ring(progress)
             button.toolTip = "바꾸는 중 \(Int(progress * 100))%"
@@ -63,11 +68,12 @@ public final class MenuBarController: NSObject {
     }
 
     @objc private func togglePopover() {
-        guard let button = item.button else { return }
+        guard let button = item.button else {
+            return
+        }
         if popover.isShown {
             popover.performClose(nil)
         } else {
-            // Active, so the popover takes ⌘V and ⌘O.
             NSApp.activate()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()

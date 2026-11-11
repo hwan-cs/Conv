@@ -3,9 +3,6 @@ import PDFKit
 
 /// .hwp and .hwpx → paginated PDF: the binary records or XML parts are read into `HwpDocument`,
 /// written as HTML per section, laid out by `PagedPDFRenderer`, and the sections' PDFs joined.
-///
-/// Headers, footers and page numbers depend on how many pages a section takes, so they are laid
-/// out afterwards and stamped over the body, as for .docx.
 @MainActor
 public struct HwpPDFConverter {
     public enum ConversionError: Error {
@@ -27,13 +24,17 @@ public struct HwpPDFConverter {
 
         let work = FileManager.default.temporaryDirectory.appending(path: "conv-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: work) }
+        defer {
+            try? FileManager.default.removeItem(at: work)
+        }
         let joined = PDFDocument()
         var nextPageNumber = 1
         for (index, section) in sections.enumerated() {
             var part = work.appending(path: "section\(index).pdf")
             try await renderer.render(html: section.html, baseURL: nil, to: part, page: section.page, script: HwpHTMLWriter.fitLines)
-            guard let body = PDFDocument(url: part) else { throw ConversionError.unreadableIntermediate }
+            guard let body = PDFDocument(url: part) else {
+                throw ConversionError.unreadableIntermediate
+            }
 
             let start = writer.pageNumberStart(section: index) ?? nextPageNumber
             nextPageNumber = start + body.pageCount
@@ -45,12 +46,16 @@ public struct HwpPDFConverter {
                 part = stamped
             }
 
-            guard let rendered = PDFDocument(url: part) else { throw ConversionError.unreadableIntermediate }
+            guard let rendered = PDFDocument(url: part) else {
+                throw ConversionError.unreadableIntermediate
+            }
             for number in 0..<rendered.pageCount {
                 if let page = rendered.page(at: number) { joined.insert(page, at: joined.pageCount) }
             }
         }
-        guard joined.write(to: output) else { throw ConversionError.unwritableOutput }
+        guard joined.write(to: output) else {
+            throw ConversionError.unwritableOutput
+        }
     }
 
     /// The intermediate HTML of every section, for inspecting what the converter produced.

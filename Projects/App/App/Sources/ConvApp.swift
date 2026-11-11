@@ -54,7 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    /// Finder's "conv.로 바꾸기": paths and the format picked. They can be read only inside folders the user allowed in Settings
+    /// Finder's "conv로 바꾸기": paths and the format picked. They can be read only inside folders the user allowed in Settings
     @objc private func finderRequested(_ notification: Notification) {
         guard let message = notification.object as? String, let request = FinderRequest(encoded: message) else {
             return

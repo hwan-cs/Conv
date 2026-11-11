@@ -11,7 +11,7 @@ struct HwpHTMLWriter {
 
     private let document: HwpDocument
     private var images: [Int: String] = [:]
-    /// Pixel sizes of those images, for cropping.
+
     private var imageSizes: [Int: CGSize] = [:]
     private var effectImages: [ImageKey: String] = [:]
 
@@ -42,8 +42,6 @@ struct HwpHTMLWriter {
             let page = section.page
             let setup = PagedPDFRenderer.PageSetup(
                 paperSize: CGSize(width: pt(page.width), height: pt(page.height)),
-                // The page area reaches into the margins by the bleed, which the body pads back out,
-                // so borders on the column's edge are not clipped with what overflows it.
                 margins: .init(
                     top: pt(page.top + page.header),
                     left: pt(page.left + page.gutter) - Self.bleed,
@@ -75,18 +73,17 @@ struct HwpHTMLWriter {
     }
 
     // MARK: Pages from the saved layout
-
-    /// The section as one box per page, each paragraph placed where Hangul's saved layout put its
-    /// lines, split where they run into the next column or page. Exact for columns and objects placed
-    /// on the page; nil when a paragraph lacks the saved layout or a table runs past its page, which
-    /// only flowing the section can lay out.
     private mutating func savedPages(_ section: HwpDocument.Section) -> String? {
         let paragraphs = section.paragraphs
-        guard !paragraphs.isEmpty, paragraphs.allSatisfy({ !$0.lineSegments.isEmpty }) else { return nil }
+        guard !paragraphs.isEmpty, paragraphs.allSatisfy({ !$0.lineSegments.isEmpty }) else {
+            return nil
+        }
         for paragraph in paragraphs {
             let tallest = paragraph.lineSegments.map(\.lineHeight).max() ?? 0
             for item in paragraph.content {
-                if case .control(.table(let table)) = item, table.layout.inline, table.layout.height > tallest + 100 { return nil }
+                if case .control(.table(let table)) = item, table.layout.inline, table.layout.height > tallest + 100 {
+                    return nil
+                }
             }
         }
 
@@ -97,10 +94,8 @@ struct HwpHTMLWriter {
         let gap = section.columns > 1 ? section.columnGap : 0
         let columnStep = (bodyWidth - gap * (section.columns - 1)) / section.columns + gap
         var column = 0
-        // Where the last line written in the current column ends.
         var bottom = 0
         for (paragraph, placement) in zip(paragraphs, placements) {
-            // Lines run together until a page or column break.
             var starts = [0] + placement.breaks.keys.filter { $0 > 0 }.sorted()
             starts = Array(Set(starts)).sorted()
             for (index, start) in starts.enumerated() {
@@ -109,8 +104,10 @@ struct HwpHTMLWriter {
                 case .page:
                     pages.append("")
                     column = 0
-                case .column: column += 1
-                case nil: break
+                case .column:
+                    column += 1
+                case nil:
+                    break
                 }
                 pages[pages.count - 1] += piece(paragraph, lines: start..<end, column: column * columnStep, top: paragraph.lineSegments[start].verticalPosition, page: page)
                 let last = paragraph.lineSegments[end - 1]
@@ -120,16 +117,11 @@ struct HwpHTMLWriter {
 
         let bodyHeight = page.height - page.top - page.header - page.bottom - page.footer
 
-        // Endnotes follow the end of the document's text, flowing through the columns and pages after it.
         if section.paragraphs.count > 0, document.sections.last.map({ $0.paragraphs.count == section.paragraphs.count }) ?? false {
             let notes = Self.endnotes(in: document.sections.flatMap(\.paragraphs))
-            // Hangul starts them right below the text; the separator spacing only applies with a separator line.
             var origin = bottom
             for (index, note) in notes.enumerated() {
                 endnote = (section.endnoteShape.start + index, section.endnoteShape)
-                // Each note's saved positions start at 0; where they restart, Hangul had moved the note on
-                // to the next column, but its viewer doesn't always break there. Lines follow on from the
-                // one before instead, and move to the next column when they don't fit.
                 var previousBottom = origin
                 for paragraph in note where !paragraph.lineSegments.isEmpty {
                     var start = 0
@@ -138,9 +130,13 @@ struct HwpHTMLWriter {
                             origin = previousBottom - segment.verticalPosition
                         }
                         let top = origin + segment.verticalPosition
-                        defer { previousBottom = origin + segment.verticalPosition + segment.lineHeight + segment.spacing }
-                        guard top + segment.lineHeight > bodyHeight, top > 0 else { continue }
-                        // What came before the line stays; the line starts the next column.
+                        defer {
+                            previousBottom = origin + segment.verticalPosition + segment.lineHeight + segment.spacing
+                        }
+                        guard top + segment.lineHeight > bodyHeight, top > 0 else {
+                            continue
+                        }
+                        
                         if line > start {
                             pages[pages.count - 1] += piece(paragraph, lines: start..<line, column: column * columnStep, top: origin + paragraph.lineSegments[start].verticalPosition, page: page)
                         }
@@ -157,12 +153,10 @@ struct HwpHTMLWriter {
                     let last = paragraph.lineSegments[count - 1]
                     bottom = origin + last.verticalPosition + last.lineHeight
                 }
-                // Like a cell, a note ends at its last line's text, without the spacing below it.
                 origin = bottom + section.endnoteShape.spaceBetween
             }
             endnote = nil
         }
-        // A block of the paper's full height spills onto a second page by WebKit's rounding.
         return pages.enumerated().map { index, html in
             let breakAfter = index < pages.count - 1 ? "break-after:page;" : ""
             return "<div style=\"position:relative;height:\(decimal(pt(page.height) - 1))pt;overflow:hidden;\(breakAfter)\"><div style=\"position:absolute;left:\(decimal(pt(page.left + page.gutter)))pt;top:\(decimal(pt(page.top + page.header)))pt;width:\(decimal(pt(bodyWidth)))pt;height:\(decimal(pt(bodyHeight)))pt;\">\(html)</div></div>"
@@ -173,11 +167,12 @@ struct HwpHTMLWriter {
     private mutating func piece(_ paragraph: HwpDocument.Paragraph, lines: Range<Int>, column: Int, top: Int, page: HwpDocument.PageDef) -> String {
         let shape = document.paraShapes[safe: paragraph.paraShapeID] ?? HwpDocument.ParaShape()
         let segment = paragraph.lineSegments[lines.lowerBound]
-        // A line's saved start is from its column's edge and includes the paragraph's left margin.
         let columnX = column + segment.columnStart - shape.left
         let columnWidth = segment.width + shape.left + shape.right
         anchor = Anchor(page: page, x: columnX, y: top, columnWidth: columnWidth, left: shape.left, right: shape.right)
-        defer { anchor = nil }
+        defer {
+            anchor = nil
+        }
         let html = self.paragraph(paragraph, placement: Placement(savedGap: 0, lines: lines))
         return "<div style=\"position:absolute;left:\(decimal(pt(columnX)))pt;top:\(decimal(pt(top)))pt;width:\(decimal(pt(columnWidth)))pt;\">\(html)</div>"
     }
@@ -187,11 +182,16 @@ struct HwpHTMLWriter {
         var notes: [[HwpDocument.Paragraph]] = []
         for paragraph in paragraphs {
             for item in paragraph.content {
-                guard case .control(let control) = item else { continue }
+                guard case .control(let control) = item else {
+                    continue
+                }
                 switch control {
-                case .endnote(let note): notes.append(note)
-                case .table(let table): notes += table.cells.flatMap { endnotes(in: $0.paragraphs) }
-                default: break
+                case .endnote(let note):
+                    notes.append(note)
+                case .table(let table):
+                    notes += table.cells.flatMap { endnotes(in: $0.paragraphs) }
+                default:
+                    break
                 }
             }
         }
@@ -199,35 +199,38 @@ struct HwpHTMLWriter {
     }
 
     // MARK: Headers and footers
-
-    /// The section's first page number when it restarts numbering, or nil when it continues.
     func pageNumberStart(section index: Int) -> Int? {
         let start = document.sections[index].pageNumberStart
         return start > 0 ? start : nil
     }
 
-    /// Headers, footers and page numbers of a section's pages, for stamping over the body once its
-    /// page count is known. Each control applies from the page holding it, known from Hangul's saved
-    /// layout (or the first page without one); 감추기 applies to its own page only.
     mutating func overlay(section index: Int, pageCount: Int, firstPageNumber: Int) -> Output? {
         let section = document.sections[index]
         typealias Placed = (page: Int, control: HwpDocument.Control)
         var placed: [Placed] = []
         var page = 0
         for (paragraph, placement) in zip(section.paragraphs, Self.placements(section.paragraphs, inBody: true, columns: section.columns)) {
-            if placement.breaks[0] == .page { page += 1 }
+            if placement.breaks[0] == .page {
+                page += 1
+            }
             for item in paragraph.content {
-                if case .control(let control) = item { placed.append((page, control)) }
+                if case .control(let control) = item {
+                    placed.append((page, control))
+                }
             }
             page += placement.breaks.filter { $0.key > 0 && $0.value == .page }.count
         }
         let relevant = placed.filter {
             switch $0.control {
-            case .header, .footer, .pageNumberPosition, .pageHide: true
-            default: false
+            case .header, .footer, .pageNumberPosition, .pageHide:
+                true
+            default:
+                false
             }
         }
-        guard relevant.contains(where: { if case .pageHide = $0.control { false } else { true } }) else { return nil }
+        guard relevant.contains(where: { if case .pageHide = $0.control { false } else { true } }) else {
+            return nil
+        }
 
         let paper = section.page
         let width = paper.width - paper.left - paper.right - paper.gutter
@@ -242,12 +245,16 @@ struct HwpHTMLWriter {
             var hidden = (header: false, footer: false, pageNumber: false)
             for item in relevant where item.page <= sheet {
                 switch item.control {
-                case .header(let header): headers[header.pages] = header
-                case .footer(let footer): footers[footer.pages] = footer
-                case .pageNumberPosition(let value): position = value
+                case .header(let header):
+                    headers[header.pages] = header
+                case .footer(let footer):
+                    footers[footer.pages] = footer
+                case .pageNumberPosition(let value):
+                    position = value
                 case .pageHide(let header, let footer, let pageNumber) where item.page == sheet:
                     hidden = (hidden.header || header, hidden.footer || footer, hidden.pageNumber || pageNumber)
-                default: break
+                default:
+                    break
                 }
             }
             let parity: HwpDocument.HeaderFooter.Pages = number % 2 == 0 ? .even : .odd
@@ -268,7 +275,6 @@ struct HwpHTMLWriter {
         pageNumber = nil
         self.pageCount = nil
 
-        // A block of the paper's full height spills onto a second page by WebKit's rounding.
         let height = decimal(pt(paper.height) - 1)
         let body = sheets.enumerated().map { index, html in
             let breakAfter = index < sheets.count - 1 ? "break-after:page;" : ""
@@ -284,19 +290,31 @@ struct HwpHTMLWriter {
     /// 쪽 번호 위치: at the top of the header area or with its line on the bottom margin.
     private func pageNumberHTML(_ position: HwpDocument.PageNumberPosition, number: Int, box: String, paper: HwpDocument.PageDef) -> String {
         var text = position.prefix + Self.format(number, style: position.style) + position.suffix
-        if !position.dash.isEmpty { text = "\(position.dash) \(text) \(position.dash)" }
+        if !position.dash.isEmpty {
+            text = "\(position.dash) \(text) \(position.dash)"
+        }
         let odd = number % 2 == 1
         let (top, align): (Bool, String) = switch position.position {
-        case 1: (true, "left")
-        case 2: (true, "center")
-        case 3: (true, "right")
-        case 4: (false, "left")
-        case 6: (false, "right")
-        case 7: (true, odd ? "right" : "left")
-        case 8: (false, odd ? "right" : "left")
-        case 9: (true, odd ? "left" : "right")
-        case 10: (false, odd ? "left" : "right")
-        default: (false, "center")
+        case 1:
+            (true, "left")
+        case 2:
+            (true, "center")
+        case 3:
+            (true, "right")
+        case 4:
+            (false, "left")
+        case 6:
+            (false, "right")
+        case 7:
+            (true, odd ? "right" : "left")
+        case 8:
+            (false, odd ? "right" : "left")
+        case 9:
+            (true, odd ? "left" : "right")
+        case 10:
+            (false, odd ? "left" : "right")
+        default:
+            (false, "center")
         }
         let shape = document.charShapes.first
         let size = Double(shape?.height ?? 1000) / 100
@@ -305,36 +323,28 @@ struct HwpHTMLWriter {
         return "<div style=\"\(box)top:\(decimal(y))pt;text-align:\(align);font-family:\(font.family);font-size:\(decimal(size))pt;line-height:1;\">\(Self.escape(text))</div>"
     }
 
-    /// A line fits on a page in Hangul when its text does; the spacing below the last line may run
-    /// into the bottom margin. CSS line boxes include that spacing, so the page area is extended by
-    /// the widest of it, plus a point for WebKit's rounding (Hangul fills pages to the hundredth).
     static func bottomSlack(_ section: HwpDocument.Section) -> Int {
         let saved = section.paragraphs.flatMap(\.lineSegments).map(\.spacing).max()
         return (saved ?? 600) + 100
     }
 
     // MARK: Paragraphs
-
-    enum Break: String { case page, column }
+    enum Break: String {
+        case page, column
+    }
 
     /// How a paragraph sits among its neighbours.
     struct Placement {
-        /// Hangul leaves out the spacing below the last line of a cell or text box.
         var closesList = false
-        /// Page and column breaks before lines, by line index, from Hangul's saved layout.
         var breaks: [Int: Break] = [:]
-        /// With Hangul's saved layout, the distance from the previous paragraph's last line to this
-        /// paragraph's first; lines then take their saved heights instead of computed ones.
         var savedGap: Int?
         /// The lines to write, when a paragraph is split across columns or pages; nil for all.
         var lines: Range<Int>?
     }
 
-    /// Where the paragraph being written sits on its page, when pages are built from the saved
-    /// layout: objects placed relative to the paper, page, column or paragraph are positioned from it.
+    /// Where the paragraph being written sits on its page, when pages are built from the saved layout
     struct Anchor {
         var page: HwpDocument.PageDef
-        /// Body coordinates of the piece being written: its column's left edge and its first line's top.
         var x: Int
         var y: Int
         var columnWidth: Int
@@ -369,7 +379,9 @@ struct HwpHTMLWriter {
             }
             result.append(placement)
         }
-        if !result.isEmpty { result[result.count - 1].closesList = !inBody }
+        if !result.isEmpty {
+            result[result.count - 1].closesList = !inBody
+        }
         return result
     }
 
@@ -379,28 +391,31 @@ struct HwpHTMLWriter {
         let writesFirstLine = placement.lines?.contains(0) ?? true
         let head = self.head(shape, charShapeID: paragraph.charShapeID, advance: writesFirstLine)
         if head.autoIndent {
-            // 자동 내어쓰기 hangs the first line by the head's width.
             let width = Int(head.width * 100)
             shape.left += width
             shape.indent -= width
         }
-        // 내어쓰기 (a negative indent) keeps the first line at the margin and moves the rest in.
         let left = shape.left - min(shape.indent, 0)
-        if left != 0 { style += "margin-left:\(decimal(pt(left)))pt;" }
-        if shape.right != 0 { style += "margin-right:\(decimal(pt(shape.right)))pt;" }
-        if shape.indent != 0 { style += "text-indent:\(decimal(pt(shape.indent)))pt;" }
+        if left != 0 {
+            style += "margin-left:\(decimal(pt(left)))pt;"
+        }
+        if shape.right != 0 {
+            style += "margin-right:\(decimal(pt(shape.right)))pt;"
+        }
+        if shape.indent != 0 {
+            style += "text-indent:\(decimal(pt(shape.indent)))pt;"
+        }
 
-        // Hangul puts a line's spacing below its text; CSS splits it above and below.
-        // Moving the paragraph up by half the gap lines the text up, keeping the paragraph's height.
         let firstShape = document.charShapes[safe: paragraph.charShapeID]
         let gap = lineGap(shape.lineSpacing, height: firstShape?.height ?? 1000)
-        // With saved heights, text sits at the top of its line, as in Hangul, and the line's own
-        // height leaves the spacing below; otherwise CSS line heights carry the spacing.
+        
         let isSaved = placement.savedGap != nil
         let spacing: HwpDocument.ParaShape.LineSpacing = isSaved ? .percent(100) : shape.lineSpacing
         let outerGap = objectGap
         objectGap = isSaved ? 0 : gap
-        defer { objectGap = outerGap }
+        defer {
+            objectGap = outerGap
+        }
         let breaks = placement.breaks
         let segments = paragraph.lineSegments
         var blocks: [String] = []
@@ -409,8 +424,12 @@ struct HwpHTMLWriter {
         if placement.savedGap == nil {
             let top = shape.spaceBefore - gap / 2
             let bottom = shape.spaceAfter + (placement.closesList ? -gap / 2 : gap / 2)
-            if top != 0 { style += "margin-top:\(decimal(pt(top)))pt;" }
-            if bottom != 0 { style += "margin-bottom:\(decimal(pt(bottom)))pt;" }
+            if top != 0 {
+                style += "margin-top:\(decimal(pt(top)))pt;"
+            }
+            if bottom != 0 {
+                style += "margin-bottom:\(decimal(pt(bottom)))pt;"
+            }
         }
 
         let justified: Bool
@@ -418,9 +437,12 @@ struct HwpHTMLWriter {
         case .justify:
             style += "text-align:justify;"
             justified = true
-        case .left: justified = false
-        case .right: style += "text-align:right;"; justified = false
-        case .center: style += "text-align:center;"; justified = false
+        case .left:
+            justified = false
+        case .right:
+            style += "text-align:right;"; justified = false
+        case .center:
+            style += "text-align:center;"; justified = false
         case .distribute, .divide:
             style += "text-align:justify;text-align-last:justify;"
             justified = true
@@ -428,24 +450,31 @@ struct HwpHTMLWriter {
         if let id = shape.borderFillID, let fill = document.borderFills[safe: id - 1] {
             style += boxStyle(fill)
         }
-        if paragraph.pageBreak || shape.pageBreakBefore || breaks[0] == .page { style += "break-before:page;" }
-        if breaks[0] == .column { style += "break-before:column;" }
-        if paragraph.columnBreak { style += "break-before:column;" }
+        if paragraph.pageBreak || shape.pageBreakBefore || breaks[0] == .page {
+            style += "break-before:page;"
+        }
+        if breaks[0] == .column {
+            style += "break-before:column;"
+        }
+        if paragraph.columnBreak {
+            style += "break-before:column;"
+        }
 
         // Where Hangul saved its line breaks, each line is laid out on its own so lines break where Hangul's do.
         let lines = paragraph.content.split(omittingEmptySubsequences: false) {
-            if case .lineStart = $0 { true } else { false }
+            if case .lineStart = $0 {
+                true
+            } else {
+                false
+            }
         }
         var html = ""
         for (number, line) in lines.enumerated() where placement.lines?.contains(number) ?? true {
-            // A zero-width run gives empty lines and table-only lines the paragraph's own line height.
             var content = number == 0 ? run("\u{200B}", shapeID: paragraph.charShapeID, spacing: spacing) : ""
             if number == 0, !head.label.isEmpty {
                 content += run(head.label, shapeID: head.shapeID, spacing: spacing)
                 content += "<span style=\"display:inline-block;width:\(decimal(head.gap))pt\"></span>"
             }
-            // The line's text between tabs, with estimated widths, for laying tabs out without measuring:
-            // where each part ends and the next begins in `content`, past the tab between them.
             var parts: [(end: Int, next: Int, width: Double)] = []
             var tabShapes: [Int] = []
             var estimate = number == 0 ? head.width : 0
@@ -457,8 +486,9 @@ struct HwpHTMLWriter {
                 switch item {
                 case .text(var text, let id):
                     if lines.count > 1, isLast {
-                        // Spaces ending a line take no room in Hangul.
-                        while text.last == " " { text.removeLast() }
+                        while text.last == " " {
+                            text.removeLast()
+                        }
                     }
                     content += run(text, shapeID: id, spacing: spacing)
                     estimate += width(of: text, shapeID: id)
@@ -469,7 +499,11 @@ struct HwpHTMLWriter {
                     tabShapes.append(id)
                     estimate = 0
                 case .lineBreak:
-                    if lines.count > 1, isLast { endsWithBreak = true } else { content += "<br>" }
+                    if lines.count > 1, isLast {
+                        endsWithBreak = true
+                    } else {
+                        content += "<br>"
+                    }
                 case .lineStart:
                     break
                 case .control(let control):
@@ -483,7 +517,7 @@ struct HwpHTMLWriter {
                                 content += floating(self.table(table, inline: false), layout: table.layout)
                                 continue
                             }
-                            // An object placed below the text of the paragraph's first line follows that line.
+                            
                             let textHeight = firstShape?.height ?? 1000
                             if table.layout.vertical == .paragraph, table.layout.y >= textHeight {
                                 trailing.append(self.table(table, inline: false, below: textHeight + gap))
@@ -506,9 +540,12 @@ struct HwpHTMLWriter {
                             break
                         }
                         let value = switch number.kind {
-                        case .page: pageNumber ?? number.number
-                        case .totalPages: pageCount ?? number.number
-                        default: number.number
+                        case .page:
+                            pageNumber ?? number.number
+                        case .totalPages:
+                            pageCount ?? number.number
+                        default:
+                            number.number
                         }
                         content += run(Self.format(value, style: number.style), shapeID: number.charShapeID, spacing: spacing)
                     default:
@@ -523,15 +560,14 @@ struct HwpHTMLWriter {
             }
             var lineStyle = number > 0 ? "text-indent:0;" : ""
             if let saved {
-                // Hangul's line height, with its spacing below unless the line ends a cell.
                 let isLast = placement.closesList && number == lines.count - 1
                 let height = saved.lineHeight + (isLast ? 0 : saved.spacing)
-                // Hairline borders drawn a device pixel wide make tables a fraction taller than Hangul's;
-                // the saved height holds. Only a table that Hangul ran onto later pages may grow its line.
                 let grows = tallestTable > saved.lineHeight
                 lineStyle += "\(grows ? "min-height" : "height"):\(decimal(pt(height)))pt;"
             }
-            if number > 0, let lineBreak = breaks[number] { lineStyle += "break-before:\(lineBreak.rawValue);" }
+            if number > 0, let lineBreak = breaks[number] {
+                lineStyle += "break-before:\(lineBreak.rawValue);"
+            }
             if holdsTab, saved != nil {
                 let bytes = Array(content.utf8)
                 var pieces: [(html: String, width: Double)] = []
@@ -543,7 +579,6 @@ struct HwpHTMLWriter {
                 html += tabbedLine(pieces, tabShapes: tabShapes, shape: shape, isFirst: number == 0, style: lineStyle, spacing: spacing)
                 continue
             }
-            // Tabs are sized to the text before them, which justification would then move.
             if holdsTab {
                 lineStyle += "text-align:left;text-align-last:auto;"
             } else if justified, number < lines.count - 1, !endsWithBreak {
@@ -552,8 +587,6 @@ struct HwpHTMLWriter {
             html += "<span class=\"line\" style=\"\(lineStyle)\">\(content)</span>"
         }
         if let savedGap = placement.savedGap {
-            // Floating tables come first in the flow, and the saved gap already holds their space.
-            // WebKit drops a margin at the top of a page, so there the gap is padding.
             let edge = breaks[0] == nil ? "margin-top" : "padding-top"
             style += "\(edge):\(decimal(pt(savedGap - blocksHeight)))pt;"
         }
@@ -582,17 +615,20 @@ struct HwpHTMLWriter {
         let definition = document.tabDefs[safe: shape.tabDefID] ?? HwpDocument.TabDef()
         let hang = pt(max(-shape.indent, 0))
         var stops = definition.stops.map { (position: pt($0.position), kind: $0.kind, leader: $0.leader) }
-        if definition.hangingStop, hang > 0 { stops.append((hang, .left, false)) }
+        if definition.hangingStop, hang > 0 {
+            stops.append((hang, .left, false))
+        }
         stops.sort { $0.position < $1.position }
 
-        // Points from the paragraph's left margin.
         let start = isFirst ? pt(max(shape.indent, 0)) : hang
         var slotStart = start
         var x = start + pieces[0].width
         var slot = pieces[0].html
         var html = ""
         func leader(_ on: Bool, shapeID: Int) -> String {
-            guard on else { return "<span style=\"flex:1\"></span>" }
+            guard on else {
+                return "<span style=\"flex:1\"></span>"
+            }
             let size = document.charShapes[safe: shapeID].map { decimal(Double($0.height) / 100) } ?? "10"
             return "<span style=\"flex:1;overflow:hidden;white-space:nowrap;text-align:right;font-size:\(size)pt;line-height:1;align-self:baseline\">\(String(repeating: "·", count: 200))</span>"
         }
@@ -632,8 +668,9 @@ struct HwpHTMLWriter {
                 x = stop + next.width
             }
         }
-        if !slot.isEmpty { html += "<span style=\"white-space:pre;flex:none\">\(slot)</span>" }
-        // The first line starts at the margin, left of the box a hanging paragraph's other lines start in.
+        if !slot.isEmpty {
+            html += "<span style=\"white-space:pre;flex:none\">\(slot)</span>"
+        }
         let shift = isFirst ? "margin-left:\(decimal(-hang))pt;" : ""
         return "<span class=\"line\" style=\"\(style)display:flex;align-items:baseline;\(shift)\">\(html)</span>"
     }
@@ -641,7 +678,9 @@ struct HwpHTMLWriter {
     /// Hangul's own advance for text, from the face it would use: the 함초롬 or full-width widths
     /// the stand-ins are spaced to, scaled by 장평 and spaced by 자간.
     private func width(of text: String, shapeID: Int) -> Double {
-        guard let shape = document.charShapes[safe: shapeID] else { return 0 }
+        guard let shape = document.charShapes[safe: shapeID] else {
+            return 0
+        }
         var total = 0.0
         for character in text {
             let script = Self.script(of: character)
@@ -660,15 +699,21 @@ struct HwpHTMLWriter {
         let definition = document.tabDefs[safe: shape.tabDefID] ?? HwpDocument.TabDef()
         var stops = definition.stops.map { stop in
             let kind = switch stop.kind {
-            case .left: "l"
-            case .right: "r"
-            case .center: "c"
-            case .decimal: "r"
+            case .left: 
+                "l"
+            case .right: 
+                "r"
+            case .center: 
+                "c"
+            case .decimal: 
+                "r"
             }
             return (stop.position, "\(decimal(pt(stop.position))):\(kind):\(stop.leader ? 1 : 0)")
         }
         let hang = max(-shape.indent, 0)
-        if definition.hangingStop, hang > 0 { stops.append((hang, "\(decimal(pt(hang))):l:0")) }
+        if definition.hangingStop, hang > 0 {
+            stops.append((hang, "\(decimal(pt(hang))):l:0"))
+        }
         let list = stops.sorted { $0.0 < $1.0 }.map(\.1).joined(separator: ",")
         let size = document.charShapes[safe: charShapeID].map { decimal(Double($0.height) / 100) } ?? "10"
         return "<span class=\"tab\" data-stops=\"\(list)\" data-default=\"\(decimal(pt(defaultTab)))\" data-origin=\"\(decimal(-pt(hang)))\"\(definition.rightEndStop ? " data-end=\"1\"" : "") style=\"font-size:\(size)pt\"></span>"
@@ -686,7 +731,9 @@ struct HwpHTMLWriter {
 
     /// - Parameter advance: Whether to count this paragraph; off for later pieces of a split one.
     private mutating func head(_ shape: HwpDocument.ParaShape, charShapeID: Int, advance: Bool = true) -> Head {
-        guard let (label, spacing) = headings.head(shape.heading, advance: advance) else { return Head() }
+        guard let (label, spacing) = headings.head(shape.heading, advance: advance) else {
+            return Head()
+        }
         let shapeID = spacing.charShapeID.flatMap { document.charShapes.indices.contains($0) ? $0 : nil } ?? charShapeID
         let size = document.charShapes[safe: shapeID].map { Double($0.height) / 100 } ?? 10
         let gap = spacing.distanceIsPercent ? Double(spacing.distance) / 100 * size : pt(spacing.distance)
@@ -695,106 +742,151 @@ struct HwpHTMLWriter {
 
     /// Bullets drawn from Hangul's symbol faces sit in the Private Use Area; most are common shapes.
     static func bulletCharacter(_ character: String) -> String {
-        guard let scalar = character.unicodeScalars.first, (0xE000...0xF8FF).contains(scalar.value) else { return character }
+        guard let scalar = character.unicodeScalars.first, (0xE000...0xF8FF).contains(scalar.value) else {
+            return character
+        }
         return switch scalar.value & 0xFF {
-        case 0x6C, 0x9F, 0xA1: "●"
-        case 0x6E, 0xA7: "■"
-        case 0x71, 0x6F: "□"
-        case 0x75, 0xA8: "◆"
-        case 0xD8, 0xE0, 0xE8: "➢"
-        case 0xFC: "✓"
-        default: "•"
+        case 0x6C, 0x9F, 0xA1: 
+            "●"
+        case 0x6E, 0xA7: 
+            "■"
+        case 0x71, 0x6F: 
+            "□"
+        case 0x75, 0xA8: 
+            "◆"
+        case 0xD8, 0xE0, 0xE8: 
+            "➢"
+        case 0xFC: 
+            "✓"
+        default: 
+            "•"
         }
     }
 
     /// 번호 모양.
     static func format(_ value: Int, style: Int) -> String {
         switch style {
-        case 1 where (1...20).contains(value): String(UnicodeScalar(0x2460 + value - 1)!)
-        case 2: roman(value)
-        case 3: roman(value).lowercased()
-        case 4: letters(value)
-        case 5: letters(value).lowercased()
-        case 8: korean(value, from: Array("가나다라마바사아자차카타파하"))
-        case 10: korean(value, from: Array("ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ"))
-        case 12: korean(value, from: Array("일이삼사오육칠팔구십"))
-        case 13: korean(value, from: Array("一二三四五六七八九十"))
-        default: String(value)
+        case 1 where (1...20).contains(value):
+            String(UnicodeScalar(0x2460 + value - 1)!)
+        case 2:
+            roman(value)
+        case 3:
+            roman(value).lowercased()
+        case 4:
+            letters(value)
+        case 5:
+            letters(value).lowercased()
+        case 8:
+            korean(value, from: Array("가나다라마바사아자차카타파하"))
+        case 10:
+            korean(value, from: Array("ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ"))
+        case 12:
+            korean(value, from: Array("일이삼사오육칠팔구십"))
+        case 13:
+            korean(value, from: Array("一二三四五六七八九十"))
+        default:
+            String(value)
         }
     }
 
     private static func roman(_ value: Int) -> String {
-        guard value > 0, value < 4000 else { return String(value) }
+        guard value > 0, value < 4000 else {
+            return String(value)
+        }
         let numerals = [(1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I")]
         var rest = value
         var result = ""
         for (amount, numeral) in numerals {
-            while rest >= amount { result += numeral; rest -= amount }
+            while rest >= amount {
+                result += numeral
+                rest -= amount
+            }
         }
         return result
     }
 
     private static func letters(_ value: Int) -> String {
-        guard value > 0 else { return String(value) }
+        guard value > 0 else {
+            return String(value)
+        }
         let letter = String(UnicodeScalar(UInt8(65 + (value - 1) % 26)))
         return String(repeating: letter, count: (value - 1) / 26 + 1)
     }
 
     private static func korean(_ value: Int, from sequence: [Character]) -> String {
-        guard value > 0 else { return String(value) }
+        guard value > 0 else {
+            return String(value)
+        }
         return String(sequence[(value - 1) % sequence.count])
     }
 
     /// 배분 정렬 spreads letters, not only words, across the line, which WebKit's justification
     /// can't do; a one-line paragraph of plain text becomes a row of letters instead.
     private func spreadLetters(_ paragraph: HwpDocument.Paragraph, spacing: HwpDocument.ParaShape.LineSpacing) -> String? {
-        guard paragraph.lineSegments.count <= 1 else { return nil }
+        guard paragraph.lineSegments.count <= 1 else {
+            return nil
+        }
         var letters: [(Character, Int)] = []
         for item in paragraph.content {
-            guard case .text(let text, let id) = item else { return nil }
+            guard case .text(let text, let id) = item else {
+                return nil
+            }
             letters += text.map { ($0, id) }
         }
         let trimmed = letters.drop { $0.0 == " " }.reversed().drop { $0.0 == " " }.reversed()
-        guard trimmed.count > 1, trimmed.count <= 24 else { return nil }
+        guard trimmed.count > 1, trimmed.count <= 24 else {
+            return nil
+        }
         return trimmed.map { run(String($0.0), shapeID: $0.1, spacing: spacing) }.joined()
     }
 
     private mutating func list(_ paragraphs: [HwpDocument.Paragraph]) -> String {
         let outer = anchor
         anchor = nil
-        defer { anchor = outer }
+        defer {
+            anchor = outer
+        }
         return zip(paragraphs, Self.placements(paragraphs, inBody: false)).map { paragraph($0, placement: $1) }.joined()
     }
 
     /// The space Hangul leaves below each line, for a line of the given text height.
     private func lineGap(_ spacing: HwpDocument.ParaShape.LineSpacing, height: Int) -> Int {
         switch spacing {
-        case .percent(let percent): height * (percent - 100) / 100
-        case .betweenLines(let value): value
-        case .fixed(let value), .atLeast(let value): max(value - height, 0)
+        case .percent(let percent):
+            height * (percent - 100) / 100
+        case .betweenLines(let value):
+            value
+        case .fixed(let value), .atLeast(let value):
+            max(value - height, 0)
         }
     }
 
     private func lineHeightCSS(_ spacing: HwpDocument.ParaShape.LineSpacing) -> String {
         switch spacing {
-        case .percent(let percent): "\(percent)%"
-        case .betweenLines(let value): "calc(1em + \(decimal(pt(value)))pt)"
-        case .fixed(let value): "\(decimal(pt(value)))pt"
-        case .atLeast(let value): "max(1em, \(decimal(pt(value)))pt)"
+        case .percent(let percent): 
+            "\(percent)%"
+        case .betweenLines(let value): 
+            "calc(1em + \(decimal(pt(value)))pt)"
+        case .fixed(let value): 
+            "\(decimal(pt(value)))pt"
+        case .atLeast(let value): 
+            "max(1em, \(decimal(pt(value)))pt)"
         }
     }
 
     // MARK: Runs
-
-    /// Hangul picks a face, scale and spacing per script; runs are split where the script changes.
     private func run(_ text: String, shapeID: Int, spacing: HwpDocument.ParaShape.LineSpacing) -> String {
-        guard let shape = document.charShapes[safe: shapeID] else { return Self.escape(text) }
+        guard let shape = document.charShapes[safe: shapeID] else {
+            return Self.escape(text)
+        }
         var html = ""
         var current = ""
         var currentScript = -1
         for character in text {
             var script = Self.script(of: character)
-            if character == " " || character == "\t" || character == "\u{200B}" { script = currentScript < 0 ? 0 : currentScript }
+            if character == " " || character == "\t" || character == "\u{200B}" {
+                script = currentScript < 0 ? 0 : currentScript
+            }
             if script != currentScript, !current.isEmpty {
                 html += span(current, shape: shape, script: currentScript, spacing: spacing)
                 current = ""
@@ -811,34 +903,57 @@ struct HwpHTMLWriter {
         var style = "font-size:\(decimal(size))pt;line-height:\(lineHeightCSS(spacing));"
         let font = HwpFonts.choice(for: document.fonts[script][safe: shape.faces[script]])
         style += "font-family:\(font.family);"
-        // 장평 (ratio) and 자간 (spacing) scale and space glyphs; CSS can only space them, which keeps
-        // the line's width, and so its breaks, where Hangul has them. The substitute face's own
-        // narrower or wider glyphs are evened out the same way.
         let ratio = Double(shape.ratios[script]) / 100
         let extra = Double(shape.spacings[script]) / 100
         let isLatin = script == 1 || script == 4
         let target = isLatin ? font.target.latin : font.target.hangul
         let actual = isLatin ? font.actual.latin : font.actual.hangul
-        // Tighter than this, glyphs overlap; the page script narrows the line instead.
+
         let letterSpacing = max(target * ratio - actual + extra, -Self.tightestSpacing)
         let wordSpacing = font.target.space * ratio - font.actual.space + extra - letterSpacing
-        // The zero-width strut must stay zero-width, or a full-width table after it wraps.
+
         let isStrut = text == "\u{200B}"
-        if abs(letterSpacing) > 0.001, !isStrut { style += "letter-spacing:\(decimal(letterSpacing))em;" }
-        if abs(wordSpacing) > 0.001, !isStrut { style += "word-spacing:\(decimal(wordSpacing))em;" }
-        if shape.bold { style += "font-weight:bold;" }
-        if shape.italic { style += "font-style:italic;" }
-        if shape.color != .black { style += "color:\(shape.color.css);" }
+        if abs(letterSpacing) > 0.001, !isStrut {
+            style += "letter-spacing:\(decimal(letterSpacing))em;"
+        }
+        if abs(wordSpacing) > 0.001, !isStrut {
+            style += "word-spacing:\(decimal(wordSpacing))em;"
+        }
+        if shape.bold {
+            style += "font-weight:bold;"
+        }
+        if shape.italic {
+            style += "font-style:italic;"
+        }
+        if shape.color != .black {
+            style += "color:\(shape.color.css);"
+        }
         var decorations: [String] = []
-        if shape.underline == .below { decorations.append("underline") }
-        if shape.underline == .above { decorations.append("overline") }
-        if shape.strikeout { decorations.append("line-through") }
-        if !decorations.isEmpty { style += "text-decoration:\(decorations.joined(separator: " "));" }
-        if let shade = shape.shadeColor, shade != Self.white { style += "background:\(shade.css);" }
-        if shape.isSuperscript { style += "vertical-align:super;font-size:\(decimal(size * 0.7))pt;" }
-        if shape.isSubscript { style += "vertical-align:sub;font-size:\(decimal(size * 0.7))pt;" }
+        if shape.underline == .below {
+            decorations.append("underline")
+        }
+        if shape.underline == .above {
+            decorations.append("overline")
+        }
+        if shape.strikeout {
+            decorations.append("line-through")
+        }
+        if !decorations.isEmpty {
+            style += "text-decoration:\(decorations.joined(separator: " "));"
+        }
+        if let shade = shape.shadeColor, shade != Self.white {
+            style += "background:\(shade.css);"
+        }
+        if shape.isSuperscript {
+            style += "vertical-align:super;font-size:\(decimal(size * 0.7))pt;"
+        }
+        if shape.isSubscript {
+            style += "vertical-align:sub;font-size:\(decimal(size * 0.7))pt;"
+        }
         let offset = shape.offsets[script]
-        if offset != 0 { style += "position:relative;top:\(decimal(Double(offset) / 100 * size))pt;" }
+        if offset != 0 {
+            style += "position:relative;top:\(decimal(Double(offset) / 100 * size))pt;"
+        }
         return "<span style=\"\(style)\">\(Self.escape(text))</span>"
     }
 
@@ -846,19 +961,26 @@ struct HwpHTMLWriter {
 
     /// 0 한글, 1 영어, 2 한자, 3 일어, 4 기타, 5 기호, 6 사용자.
     static func script(of character: Character) -> Int {
-        guard let scalar = character.unicodeScalars.first?.value else { return 1 }
+        guard let scalar = character.unicodeScalars.first?.value else {
+            return 1
+        }
         switch scalar {
-        case 0xAC00...0xD7A3, 0x1100...0x11FF, 0x3130...0x318F, 0xA960...0xA97F, 0xD7B0...0xD7FF: return 0
-        case 0x4E00...0x9FFF, 0x3400...0x4DBF, 0xF900...0xFAFF, 0x20000...0x2FFFF: return 2
-        case 0x3040...0x30FF, 0x31F0...0x31FF: return 3
-        case 0x2000...0x2BFF, 0x3000...0x303F, 0x3200...0x33FF, 0xFF00...0xFFEF, 0x25A0...0x25FF: return 5
-        case 0...0x024F: return 1
-        default: return 4
+        case 0xAC00...0xD7A3, 0x1100...0x11FF, 0x3130...0x318F, 0xA960...0xA97F, 0xD7B0...0xD7FF:
+            return 0
+        case 0x4E00...0x9FFF, 0x3400...0x4DBF, 0xF900...0xFAFF, 0x20000...0x2FFFF:
+            return 2
+        case 0x3040...0x30FF, 0x31F0...0x31FF:
+            return 3
+        case 0x2000...0x2BFF, 0x3000...0x303F, 0x3200...0x33FF, 0xFF00...0xFFEF, 0x25A0...0x25FF:
+            return 5
+        case 0...0x024F:
+            return 1
+        default:
+            return 4
         }
     }
 
     // MARK: Tables
-
     /// - Parameter below: For a table following its paragraph's first line, that line's height,
     ///   which its offset from the paragraph's top already includes.
     private mutating func table(_ table: HwpDocument.Table, inline: Bool, below: Int = 0) -> String {
@@ -867,10 +989,10 @@ struct HwpHTMLWriter {
         if table.cellSpacing > 0 {
             style += "border-collapse:separate;border-spacing:\(decimal(pt(table.cellSpacing)))pt;"
         }
-        if let fill = document.borderFills[safe: table.borderFillID - 1]?.fill { style += "background:\(fill.css);" }
+        if let fill = document.borderFills[safe: table.borderFillID - 1]?.fill {
+            style += "background:\(fill.css);"
+        }
         if inline {
-            // Collapsed outer borders reach half their width past the table; without the negative margin
-            // a full-width table no longer fits its line and drops below it.
             style += "display:inline-table;vertical-align:bottom;text-indent:0;text-align:left;margin-right:-2pt;"
         } else {
             style += tableBlockPlacement(table.layout, below: below)
@@ -890,7 +1012,9 @@ struct HwpHTMLWriter {
             let cells = (rows[row] ?? []).sorted { $0.column < $1.column }
             let height = cells.filter { $0.rowSpan == 1 }.map(\.height).max() ?? 0
             html += "<tr style=\"height:\(decimal(pt(height)))pt\">"
-            for cell in cells { html += self.cell(cell) }
+            for cell in cells {
+                html += self.cell(cell)
+            }
             html += "</tr>"
         }
         return html + "</table>"
@@ -899,27 +1023,41 @@ struct HwpHTMLWriter {
     private func tableBlockPlacement(_ layout: HwpDocument.ObjectLayout, below: Int = 0) -> String {
         var style = ""
         switch layout.horizontalAlign {
-        case 1: style += "margin-left:auto;margin-right:auto;"
-        case 2: style += "margin-left:auto;"
-        default: if layout.x != 0 { style += "margin-left:\(decimal(pt(layout.x)))pt;" }
+        case 1: 
+            style += "margin-left:auto;margin-right:auto;"
+        case 2: 
+            style += "margin-left:auto;"
+        default:
+            if layout.x != 0 {
+                style += "margin-left:\(decimal(pt(layout.x)))pt;"
+            }
         }
         let top = layout.y - below + layout.margins.top
-        if top != 0 { style += "margin-top:\(decimal(pt(top)))pt;" }
-        if layout.margins.bottom != 0 { style += "margin-bottom:\(decimal(pt(layout.margins.bottom)))pt;" }
+        if top != 0 {
+            style += "margin-top:\(decimal(pt(top)))pt;"
+        }
+        if layout.margins.bottom != 0 {
+            style += "margin-bottom:\(decimal(pt(layout.margins.bottom)))pt;"
+        }
         return style
     }
 
     private mutating func cell(_ cell: HwpDocument.Table.Cell) -> String {
-        // Hangul's cell height includes its borders; CSS adds half of each collapsed border outside the padding.
         let fill = document.borderFills[safe: cell.borderFillID - 1]
         let top = pt(cell.padding.top) - (fill.map { Self.points($0.top) } ?? 0) / 2
         let bottom = pt(cell.padding.bottom) - (fill.map { Self.points($0.bottom) } ?? 0) / 2
         var style = "padding:\(decimal(max(top, 0)))pt \(decimal(pt(cell.padding.right)))pt \(decimal(max(bottom, 0)))pt \(decimal(pt(cell.padding.left)))pt;"
         style += "vertical-align:\(["top", "middle", "bottom"][min(cell.verticalAlign, 2)]);"
-        if let fill { style += boxStyle(fill) }
+        if let fill {
+            style += boxStyle(fill)
+        }
         var attributes = ""
-        if cell.columnSpan > 1 { attributes += " colspan=\"\(cell.columnSpan)\"" }
-        if cell.rowSpan > 1 { attributes += " rowspan=\"\(cell.rowSpan)\"" }
+        if cell.columnSpan > 1 {
+            attributes += " colspan=\"\(cell.columnSpan)\""
+        }
+        if cell.rowSpan > 1 {
+            attributes += " rowspan=\"\(cell.rowSpan)\""
+        }
         let body = list(cell.paragraphs)
         return "<td\(attributes) style=\"\(style)\">\(body)</td>"
     }
@@ -936,10 +1074,14 @@ struct HwpHTMLWriter {
             for cell in table.cells where cell.columnSpan > 1 && cell.column < table.columns {
                 let range = cell.column..<min(cell.column + cell.columnSpan, table.columns)
                 let unknown = range.filter { widths[$0] == nil }
-                guard !unknown.isEmpty else { continue }
+                guard !unknown.isEmpty else {
+                    continue
+                }
                 let known = range.compactMap { widths[$0] }.reduce(0, +)
                 let share = max(cell.width - known, 0) / unknown.count
-                for column in unknown { widths[column] = share }
+                for column in unknown {
+                    widths[column] = share
+                }
                 changed = true
             }
         }
@@ -958,24 +1100,32 @@ struct HwpHTMLWriter {
                 style += "border-\(name):\(decimal(Self.points(border)))pt \(line.css) \(border.color.css);"
             }
         }
-        if let color = fill.fill { style += "background:\(color.css);" }
-        if let image = fill.image { style += imageFillStyle(image) }
+        if let color = fill.fill {
+            style += "background:\(color.css);"
+        }
+        if let image = fill.image {
+            style += imageFillStyle(image)
+        }
         return style
     }
 
     private mutating func imageFillStyle(_ fill: HwpDocument.ImageFill) -> String {
         let source = imageSource(fill.binID, effect: fill.effect)
-        guard !source.isEmpty else { return "" }
+        guard !source.isEmpty else {
+            return ""
+        }
         let placement = switch fill.mode {
-        case .tile: "background-repeat:repeat;"
-        case .stretch: "background-size:100% 100%;background-repeat:no-repeat;"
-        case .center: "background-position:center;background-repeat:no-repeat;"
+        case .tile:
+            "background-repeat:repeat;"
+        case .stretch:
+            "background-size:100% 100%;background-repeat:no-repeat;"
+        case .center: 
+            "background-position:center;background-repeat:no-repeat;"
         }
         return "background-image:url(\(source));\(placement)"
     }
 
     // MARK: Objects
-
     /// Half the line gap above and below an inline object: the paragraph is already moved up by half.
     private var objectGapMargins: String {
         objectGap == 0 ? "" : "margin:\(decimal(pt(objectGap / 2)))pt 0;"
@@ -988,10 +1138,9 @@ struct HwpHTMLWriter {
         if let line = picture.border.style {
             style += "outline:\(decimal(picture.border.width * 72 / 25.4))pt \(line.css) \(picture.border.color.css);"
         }
-        _ = imageSource(picture.binID) // Measures the image for cropping.
+        _ = imageSource(picture.binID)
         var image = "<img src=\"\(source)\" style=\"\(style)display:block;\">"
         if let frame = Self.cropFrame(picture, pixels: imageSizes[picture.binID]) {
-            // The whole image, scaled so the cropped part fills the box, inside a box that hides the rest.
             let imageStyle = "position:absolute;max-width:none;left:\(decimal(pt(frame.x)))pt;top:\(decimal(pt(frame.y)))pt;width:\(decimal(pt(frame.width)))pt;height:\(decimal(pt(frame.height)))pt;"
             image = "<span style=\"display:block;position:relative;overflow:hidden;\(style)\"><img src=\"\(source)\" style=\"\(imageStyle)\"></span>"
         }
@@ -1001,19 +1150,16 @@ struct HwpHTMLWriter {
         return floating(image, layout: picture.layout)
     }
 
-    /// Where the whole image goes, in HWPUNIT relative to the picture's box, when only part of it
-    /// shows; nil when it shows whole.
-    ///
-    /// Crop values count 75 per pixel, so the image's full size is its pixel size times 75. Without
-    /// the pixel size, the image rectangle's far corner stands in: it is the full size for pictures
-    /// cropped in Hangul.
+    /// Where the whole image goes, in HWPUNIT relative to the picture's box, when only part of it shows; nil when it shows whole.
     static func cropFrame(_ picture: HwpDocument.Picture, pixels: CGSize?) -> (x: Int, y: Int, width: Int, height: Int)? {
         let crop = picture.crop
         let cropWidth = crop.right - crop.left
         let cropHeight = crop.bottom - crop.top
-        guard cropWidth > 0, cropHeight > 0 else { return nil }
+        guard cropWidth > 0, cropHeight > 0 else {
+            return nil
+        }
         let full: (width: Int, height: Int) = pixels.map { (Int($0.width * 75), Int($0.height * 75)) } ?? picture.extent
-        // Crop values may run a pixel past the edge.
+        
         let slack = (width: max(full.width / 100, 75), height: max(full.height / 100, 75))
         if crop.left <= slack.width, crop.top <= slack.height, crop.right >= full.width - slack.width, crop.bottom >= full.height - slack.height {
             return nil
@@ -1029,11 +1175,17 @@ struct HwpHTMLWriter {
 
     /// The image as a data URL, drawn in gray for 그림 효과: WebKit leaves CSS filters out of PDFs.
     private mutating func imageSource(_ id: Int, effect: HwpDocument.Picture.Effect) -> String {
-        guard effect != .none else { return imageSource(id) }
+        guard effect != .none else {
+            return imageSource(id)
+        }
         let key = ImageKey(id: id, effect: effect)
-        if let cached = effectImages[key] { return cached }
+        if let cached = effectImages[key] {
+            return cached
+        }
         guard let item = document.binData[id], let data = try? item.data(),
-              let gray = Self.grayPNG(from: data, blackAndWhite: effect == .blackAndWhite) else { return imageSource(id) }
+              let gray = Self.grayPNG(from: data, blackAndWhite: effect == .blackAndWhite) else {
+            return imageSource(id)
+        }
         let source = "data:image/png;base64,\(gray.base64EncodedString())"
         effectImages[key] = source
         return source
@@ -1046,35 +1198,49 @@ struct HwpHTMLWriter {
                   data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
                   space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
               ),
-              let pixels = context.data?.assumingMemoryBound(to: UInt8.self) else { return nil }
+              let pixels = context.data?.assumingMemoryBound(to: UInt8.self) else {
+            return nil
+        }
         context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         for index in stride(from: 0, to: image.width * image.height * 4, by: 4) {
             let luma = (299 * Int(pixels[index]) + 587 * Int(pixels[index + 1]) + 114 * Int(pixels[index + 2])) / 1000
-            // Channels are premultiplied by alpha: black and white splits at half of it.
             let alpha = Int(pixels[index + 3])
             let value = UInt8(blackAndWhite ? (luma * 2 >= alpha ? alpha : 0) : luma)
             pixels[index] = value
             pixels[index + 1] = value
             pixels[index + 2] = value
         }
-        guard let gray = context.makeImage() else { return nil }
+        guard let gray = context.makeImage() else {
+            return nil
+        }
         let output = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(output, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        guard let destination = CGImageDestinationCreateWithData(output, UTType.png.identifier as CFString, 1, nil) else {
+            return nil
+        }
         CGImageDestinationAddImage(destination, gray, nil)
         return CGImageDestinationFinalize(destination) ? output as Data : nil
     }
 
     private mutating func imageSource(_ id: Int) -> String {
-        if let cached = images[id] { return cached }
-        guard let item = document.binData[id], var data = try? item.data() else { return "" }
+        if let cached = images[id] {
+            return cached
+        }
+        guard let item = document.binData[id], var data = try? item.data() else {
+            return ""
+        }
         var type = switch item.extension {
-        case "jpg", "jpeg": "image/jpeg"
-        case "png", "gif", "webp": "image/\(item.extension)"
-        default: ""
+        case "jpg", "jpeg":
+            "image/jpeg"
+        case "png", "gif", "webp":
+            "image/\(item.extension)"
+        default:
+            ""
         }
         // WebKit can't decode the BMPs and TIFFs Hangul often embeds; ImageIO can.
         if type.isEmpty {
-            guard let png = Self.png(from: data) else { return "" }
+            guard let png = Self.png(from: data) else {
+                return ""
+            }
             data = png
             type = "image/png"
         }
@@ -1090,9 +1256,13 @@ struct HwpHTMLWriter {
 
     static func png(from data: Data) -> Data? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            return nil
+        }
         let output = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(output, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        guard let destination = CGImageDestinationCreateWithData(output, UTType.png.identifier as CFString, 1, nil) else {
+            return nil
+        }
         CGImageDestinationAddImage(destination, image, nil)
         return CGImageDestinationFinalize(destination) ? output as Data : nil
     }
@@ -1101,32 +1271,44 @@ struct HwpHTMLWriter {
     private func floating(_ content: String, layout: HwpDocument.ObjectLayout) -> String {
         let width = "width:\(decimal(pt(layout.width)))pt;height:\(decimal(pt(layout.height)))pt;"
         if let anchor {
-            // Paper coordinates of the reference area, then of the object, then relative to the piece.
             let page = anchor.page
             let bodyLeft = page.left + page.gutter
             let bodyTop = page.top + page.header
             let bodyWidth = page.width - page.left - page.right - page.gutter
             let bodyHeight = page.height - bodyTop - page.bottom - page.footer
             let (referenceX, referenceWidth): (Int, Int) = switch layout.horizontal {
-            case .paper: (0, page.width)
-            case .page: (bodyLeft, bodyWidth)
-            case .column: (bodyLeft + anchor.x, anchor.columnWidth)
-            case .paragraph: (bodyLeft + anchor.x + anchor.left, anchor.columnWidth - anchor.left - anchor.right)
+            case .paper:
+                (0, page.width)
+            case .page:
+                (bodyLeft, bodyWidth)
+            case .column:
+                (bodyLeft + anchor.x, anchor.columnWidth)
+            case .paragraph:
+                (bodyLeft + anchor.x + anchor.left, anchor.columnWidth - anchor.left - anchor.right)
             }
             let (referenceY, referenceHeight): (Int, Int) = switch layout.vertical {
-            case .paper: (0, page.height)
-            case .page, .column: (bodyTop, bodyHeight)
-            case .paragraph: (bodyTop + anchor.y, 0)
+            case .paper:
+                (0, page.height)
+            case .page, .column:
+                (bodyTop, bodyHeight)
+            case .paragraph:
+                (bodyTop + anchor.y, 0)
             }
             let x = switch layout.horizontalAlign {
-            case 1: referenceX + (referenceWidth - layout.width) / 2 + layout.x
-            case 2: referenceX + referenceWidth - layout.width - layout.x
-            default: referenceX + layout.x
+            case 1:
+                referenceX + (referenceWidth - layout.width) / 2 + layout.x
+            case 2:
+                referenceX + referenceWidth - layout.width - layout.x
+            default:
+                referenceX + layout.x
             }
             let y = switch layout.verticalAlign {
-            case 1: referenceY + (referenceHeight - layout.height) / 2 + layout.y
-            case 2: referenceY + referenceHeight - layout.height - layout.y
-            default: referenceY + layout.y
+            case 1:
+                referenceY + (referenceHeight - layout.height) / 2 + layout.y
+            case 2:
+                referenceY + referenceHeight - layout.height - layout.y
+            default:
+                referenceY + layout.y
             }
             let left = x - bodyLeft - anchor.x
             let top = y - bodyTop - anchor.y
@@ -1137,11 +1319,18 @@ struct HwpHTMLWriter {
         case .topAndBottom:
             var style = "display:block;\(width)"
             switch layout.horizontalAlign {
-            case 1: style += "margin-left:auto;margin-right:auto;"
-            case 2: style += "margin-left:auto;"
-            default: if layout.x != 0 { style += "margin-left:\(decimal(pt(layout.x)))pt;" }
+            case 1: 
+                style += "margin-left:auto;margin-right:auto;"
+            case 2: 
+                style += "margin-left:auto;"
+            default:
+                if layout.x != 0 {
+                    style += "margin-left:\(decimal(pt(layout.x)))pt;"
+                }
             }
-            if layout.y != 0 { style += "margin-top:\(decimal(pt(layout.y)))pt;" }
+            if layout.y != 0 {
+                style += "margin-top:\(decimal(pt(layout.y)))pt;"
+            }
             return "<span style=\"\(style)\">\(content)</span>"
         default:
             let z = layout.wrap == .behindText ? -1 : 1
@@ -1165,9 +1354,15 @@ struct HwpHTMLWriter {
             if let line = shape.line.style {
                 style += "border:\(decimal(max(shape.line.width * 72 / 25.4, 0.5)))pt \(line.css) \(shape.line.color.css);"
             }
-            if let fill = shape.fill { style += "background:\(fill.css);" }
-            if let image = shape.image { style += imageFillStyle(image) }
-            if shape.kind == .ellipse { style += "border-radius:50%;" }
+            if let fill = shape.fill {
+                style += "background:\(fill.css);"
+            }
+            if let image = shape.image {
+                style += imageFillStyle(image)
+            }
+            if shape.kind == .ellipse {
+                style += "border-radius:50%;"
+            }
             if shape.cornerRatio > 0 {
                 style += "border-radius:\(decimal(min(width, height) * Double(shape.cornerRatio) / 100))pt;"
             }
@@ -1177,9 +1372,12 @@ struct HwpHTMLWriter {
             let text = list(shape.text)
             let children = shape.children.map { child -> String in
                 switch child {
-                case .shape(let nested): return self.shape(nested)
-                case .picture(let picture): return self.picture(picture)
-                default: return ""
+                case .shape(let nested):
+                    return self.shape(nested)
+                case .picture(let picture):
+                    return self.picture(picture)
+                default: 
+                    return ""
                 }
             }.joined()
             inner = "<div style=\"\(style)\">\(text)</div>\(children)"
@@ -1199,25 +1397,28 @@ struct HwpHTMLWriter {
     }
 
     // MARK: HTML
-
     private func pt(_ value: Int) -> Double { Double(value) / 100 }
 
     static func escape(_ text: String) -> String {
         var result = ""
         for character in text {
             switch character {
-            case "&": result += "&amp;"
-            case "<": result += "&lt;"
-            case ">": result += "&gt;"
-            case "\"": result += "&quot;"
-            default: result.append(character)
+            case "&":
+                result += "&amp;"
+            case "<":
+                result += "&lt;"
+            case ">": 
+                result += "&gt;"
+            case "\"":
+                result += "&quot;"
+            default:
+                result.append(character)
             }
         }
         return result
     }
 
     static let bleed = 4.0
-    /// The most letter spacing may take away, in em, before a line is narrowed instead.
     static let tightestSpacing = 0.08
 
     /// Squeezes lines that Hangul fit and the substitute faces don't, by tightening their spacing.
@@ -1305,7 +1506,6 @@ struct HwpHTMLWriter {
         """
 
     static func htmlPage(_ body: String, bleed: Double = bleed) -> String {
-        // Only the bundled faces the page uses are embedded; each is a few megabytes.
         let fontFaces = HwpFonts.Bundled.allCases.filter { body.contains($0.cssFamily) }.map(\.fontFaces).joined(separator: "\n")
         return """
         <!doctype html><html><head><meta charset="utf-8"><style>

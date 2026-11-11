@@ -13,7 +13,7 @@ public enum ConvColor {
     public static let success = Color(hex: 0x2BB673)
     public static let errorFill = Color(hex: 0xFFEDE5)
     public static let errorText = Color(hex: 0xB23A10)
-    /// Muted text on the dark drop zone.
+
     public static let onInkMuted = Color(hex: 0xA39C8E)
 }
 

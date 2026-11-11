@@ -1,15 +1,10 @@
 import Foundation
 
 /// Writes a converted file next to its original: "보고서.docx" → "보고서.pdf".
-///
-/// The sandbox only grants the file the user picked. The app declares its output types as related
-/// items (`NSIsRelatedItemType`), which lets a file presenter for the original create a file with
-/// the same name and another extension beside it, through file coordination.
 public enum SiblingWriter {
     public enum WriteError: Error {
         /// A file of that name is already there; it is never replaced.
         case exists(URL)
-        /// The sandbox refused, e.g. for a type the app doesn't declare as related.
         case denied(URL, underlying: Error)
     }
 
@@ -26,9 +21,7 @@ public enum SiblingWriter {
         try write(nextTo: original, extension: ext) { try copy(handle, to: $0, overwriting: false) }
     }
 
-    /// Like `copy(_:nextTo:extension:)`, but when the name is taken it writes "보고서 2.pdf",
-    /// "보고서 3.pdf"… instead of failing, for conversions with no window to ask in. Only names
-    /// other than the related item's need the folder to be granted.
+    /// Like `copy(_:nextTo:extension:)`, but when the name is taken it writes "보고서 2.pdf"  instead of failing
     public static func copyKeepingBoth(_ handle: FileHandle, nextTo original: URL, extension ext: String) throws -> URL {
         for number in 1...99 {
             let target = numbered(sibling(of: original, extension: ext), number)
@@ -43,7 +36,9 @@ public enum SiblingWriter {
 
     /// "보고서.pdf" for 1, "보고서 2.pdf" for 2, as Finder numbers copies.
     public static func numbered(_ url: URL, _ number: Int) -> URL {
-        guard number > 1 else { return url }
+        guard number > 1 else {
+            return url
+        }
         let base = url.deletingPathExtension().lastPathComponent
         return url.deletingLastPathComponent().appending(path: "\(base) \(number)").appendingPathExtension(url.pathExtension)
     }
@@ -57,9 +52,13 @@ public enum SiblingWriter {
         if !overwriting, FileManager.default.fileExists(atPath: url.path) {
             throw CocoaError(.fileWriteFileExists)
         }
-        guard FileManager.default.createFile(atPath: url.path, contents: nil) else { throw CocoaError(.fileWriteNoPermission) }
+        guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
+            throw CocoaError(.fileWriteNoPermission)
+        }
         let output = try FileHandle(forWritingTo: url)
-        defer { try? output.close() }
+        defer {
+            try? output.close()
+        }
         try handle.seek(toOffset: 0)
         while let chunk = try handle.read(upToCount: 4 << 20), !chunk.isEmpty {
             try output.write(contentsOf: chunk)
@@ -73,7 +72,9 @@ public enum SiblingWriter {
     static func write(to target: URL, primary original: URL, _ body: (URL) throws -> Void) throws -> URL {
         let presenter = RelatedItemPresenter(primary: original, item: target)
         NSFileCoordinator.addFilePresenter(presenter)
-        defer { NSFileCoordinator.removeFilePresenter(presenter) }
+        defer {
+            NSFileCoordinator.removeFilePresenter(presenter)
+        }
 
         var coordinationError: NSError?
         var writeError: Error?
@@ -85,7 +86,9 @@ public enum SiblingWriter {
             }
         }
         if let error = writeError ?? coordinationError {
-            if (error as NSError).code == NSFileWriteFileExistsError { throw WriteError.exists(target) }
+            if (error as NSError).code == NSFileWriteFileExistsError {
+                throw WriteError.exists(target)
+            }
             throw WriteError.denied(target, underlying: error)
         }
         return target

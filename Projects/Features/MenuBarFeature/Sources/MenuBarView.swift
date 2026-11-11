@@ -3,8 +3,7 @@ import DesignSystem
 import Platform
 import SwiftUI
 
-/// The menu bar item's popover: the clipboard on ⌘V, the recent conversions, and the way to the
-/// main window.
+/// The menu bar item's popover: the clipboard on ⌘V, the recent conversions, and the way to the main window.
 struct MenuBarView: View {
     let close: () -> Void
     @State private var notice: String?
@@ -30,7 +29,8 @@ struct MenuBarView: View {
                 showMainWindow()
             } label: {
                 HStack {
-                    Text("conv. 열기").font(ConvFont.sans(13, .semibold))
+                    Text("conv 열기")
+                        .font(ConvFont.sans(13, .semibold))
                     Spacer()
                     Text("⌘O").font(ConvFont.mono(11)).foregroundStyle(ConvColor.muted)
                 }
@@ -127,15 +127,11 @@ struct MenuBarView: View {
     }
 
     // MARK: Actions
-
     private func showMainWindow() {
         close()
         MainWindow.show()
     }
 
-    /// Files copied in Finder go the way of a drop. Only image data (a copied screenshot, an image
-    /// copied in a browser) is pasted as an image; Finder also puts a file's icon on the clipboard,
-    /// which must not be mistaken for the file.
     private func paste() {
         let pasteboard = NSPasteboard.general
         let files = (pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []

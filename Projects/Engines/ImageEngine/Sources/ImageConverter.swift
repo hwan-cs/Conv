@@ -3,8 +3,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-/// Image → image (or PDF) through ImageIO, which decodes everything macOS can show and encodes
-/// all but WebP.
+/// Image → image (or PDF) through ImageIO, which decodes everything macOS can show and encodes all but WebP.
 public struct ImageConverter: Sendable {
     public enum ConversionError: Error, Equatable {
         case unreadable
@@ -12,27 +11,28 @@ public struct ImageConverter: Sendable {
         case encodingFailed
     }
 
-    /// Extensions ImageIO reads.
     public static let inputs: Set<String> = ["heic", "heif", "jpg", "jpeg", "png", "webp", "tiff", "tif", "gif", "bmp", "avif"]
 
-    /// Extensions this converter writes, with the type ImageIO encodes them as.
     public static let outputs: [String: UTType] = [
         "jpg": .jpeg, "png": .png, "heic": .heic, "tiff": .tiff, "gif": .gif, "bmp": .bmp,
         "avif": UTType("public.avif") ?? .image, "pdf": .pdf,
     ]
 
-    /// Quality for lossy outputs: visually lossless for photos at about half the size of 1.0.
     public var quality = 0.9
 
     public init() {}
 
     public func convert(_ input: URL, to output: URL) throws {
         let ext = output.pathExtension.lowercased()
-        guard let type = Self.outputs[ext] else { throw ConversionError.unsupportedOutput(ext) }
+        guard let type = Self.outputs[ext] else {
+            throw ConversionError.unsupportedOutput(ext)
+        }
         guard let source = CGImageSourceCreateWithURL(input as CFURL, nil),
               CGImageSourceGetCount(source) > 0,
               CGImageSourceCreateImageAtIndex(source, 0, nil) != nil
-        else { throw ConversionError.unreadable }
+        else {
+            throw ConversionError.unreadable
+        }
 
         if type == .pdf {
             try writePDF(source, to: output)
@@ -47,23 +47,27 @@ public struct ImageConverter: Sendable {
         let dropsAlpha = type == .jpeg || type == .bmp
         for index in 0..<frames {
             if dropsAlpha, Self.hasAlpha(source, at: index), let image = CGImageSourceCreateImageAtIndex(source, index, nil) {
-                // JPEG has no transparency; ImageIO would turn it black. Flatten onto white instead.
-                guard let flattened = Self.flattened(image) else { throw ConversionError.encodingFailed }
+                guard let flattened = Self.flattened(image) else {
+                    throw ConversionError.encodingFailed
+                }
                 let properties = (CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any]) ?? [:]
                 CGImageDestinationAddImage(destination, flattened, properties.merging(options) { $1 } as CFDictionary)
             } else {
-                // Copies the frame with its metadata, orientation included.
                 CGImageDestinationAddImageFromSource(destination, source, index, options as CFDictionary)
             }
         }
-        guard CGImageDestinationFinalize(destination) else { throw ConversionError.encodingFailed }
+        guard CGImageDestinationFinalize(destination) else {
+            throw ConversionError.encodingFailed
+        }
     }
 
     /// One page per frame, each the image's size at its own resolution, upright.
     private func writePDF(_ source: CGImageSource, to output: URL) throws {
         guard let context = CGContext(output as CFURL, mediaBox: nil, nil) else { throw ConversionError.encodingFailed }
         for index in 0..<CGImageSourceGetCount(source) {
-            guard let image = Self.upright(source, at: index) else { continue }
+            guard let image = Self.upright(source, at: index) else {
+                continue
+            }
             let properties = (CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any]) ?? [:]
             let dpi = (properties[kCGImagePropertyDPIWidth] as? Double).flatMap { $0 > 0 ? $0 : nil } ?? 72
             var box = CGRect(x: 0, y: 0, width: Double(image.width) * 72 / dpi, height: Double(image.height) * 72 / dpi)
@@ -84,7 +88,9 @@ public struct ImageConverter: Sendable {
         guard let context = CGContext(
             data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
             space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-        ) else { return nil }
+        ) else {
+            return nil
+        }
         let rect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
         context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
         context.fill(rect)

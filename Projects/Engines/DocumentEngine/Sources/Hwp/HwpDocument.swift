@@ -1,8 +1,6 @@
 import Foundation
 
 /// The document model shared by the .hwp (binary) and .hwpx (XML) readers.
-///
-/// Lengths are HWPUNIT, 1/7200 inch (1/100 pt), as both formats store them.
 struct HwpDocument {
     /// Faces per script: 한글, 영어, 한자, 일어, 기타, 기호, 사용자.
     var fonts: [[Font]] = Array(repeating: [], count: 7)
@@ -49,11 +47,12 @@ struct HwpDocument {
     }
 
     struct ParaShape {
-        enum Alignment { case justify, left, right, center, distribute, divide }
+        enum Alignment {
+            case justify, left, right, center, distribute, divide
+        }
         enum LineSpacing {
             case percent(Int)
             case fixed(Int)
-            /// 여백만 지정: the gap between lines, added to the text height.
             case betweenLines(Int)
             case atLeast(Int)
         }
@@ -61,7 +60,6 @@ struct HwpDocument {
         var alignment: Alignment = .justify
         var left = 0
         var right = 0
-        /// Positive indents the first line; negative is a hanging indent (내어쓰기).
         var indent = 0
         var spaceBefore = 0
         var spaceAfter = 0
@@ -73,7 +71,9 @@ struct HwpDocument {
         var pageBreakBefore = false
 
         struct Heading {
-            enum Kind { case outline, numbering, bullet }
+            enum Kind {
+                case outline, numbering, bullet
+            }
             var kind: Kind
             /// 1-based numbering or bullet id; 0 means the section's outline numbering.
             var id: Int
@@ -88,7 +88,20 @@ struct HwpDocument {
         var width: Double
         var color: Color
 
-        enum Style { case solid, dash, dot, dashDot, dashDotDot, longDash, circle, double, thinThick, thickThin, triple, wave }
+        enum Style {
+            case solid
+            case dash
+            case dot
+            case dashDot
+            case dashDotDot
+            case longDash
+            case circle
+            case double
+            case thinThick
+            case thickThin
+            case triple
+            case wave
+        }
 
         static let none = Border(style: nil, width: 0, color: .black)
     }
@@ -102,9 +115,11 @@ struct HwpDocument {
         var image: ImageFill?
     }
 
-    /// A picture filling a box (채우기 › 그림).
+    /// A picture filling a box (채우기 >  그림).
     struct ImageFill {
-        enum Mode { case tile, stretch, center }
+        enum Mode {
+            case tile, stretch, center
+        }
         var binID: Int
         var mode: Mode
         var effect: Picture.Effect = .none
@@ -136,7 +151,9 @@ struct HwpDocument {
     }
 
     struct TabStop {
-        enum Kind { case left, right, center, decimal }
+        enum Kind {
+            case left, right, center, decimal
+        }
         var position: Int
         var kind: Kind
         var leader: Bool
@@ -147,9 +164,7 @@ struct HwpDocument {
         /// Gap between the head and the text: a percent of the font size, or HWPUNIT.
         var distance = 50
         var distanceIsPercent = true
-        /// 자동 내어쓰기: the paragraph's other lines start where the text after the head does.
         var autoIndent = false
-        /// The head's own character shape, when it doesn't take the paragraph's.
         var charShapeID: Int?
     }
 
@@ -157,7 +172,6 @@ struct HwpDocument {
         struct Level {
             /// Format with ^1..^7 placeholders, e.g. "^1." or "(^2)".
             var format: String
-            /// 번호 모양: 0 1,2,3; 1 ①; 2 I; 3 i; 4 A; 5 a; 8 가; 10 ㄱ; 12 일; 13 一.
             var style: Int
             var start: Int
             var spacing = HeadSpacing()
@@ -184,7 +198,9 @@ struct HwpDocument {
 
         /// COLORREF is 0x00BBGGRR; values with the top byte set mean "none".
         init?(colorRef: UInt32) {
-            guard colorRef >> 24 == 0 else { return nil }
+            guard colorRef >> 24 == 0 else {
+                return nil
+            }
             self.init(red: UInt8(colorRef & 0xFF), green: UInt8(colorRef >> 8 & 0xFF), blue: UInt8(colorRef >> 16 & 0xFF))
         }
 
@@ -213,7 +229,6 @@ struct HwpDocument {
     struct Section {
         var page = PageDef()
         var pageNumberStart = 0
-        /// 1-based numbering id of the section's 개요 번호 (outline numbering).
         var outlineNumberingID = 0
         var endnoteShape = NoteShape()
         var columns = 1
@@ -228,7 +243,6 @@ struct HwpDocument {
         var prefix = ""
         var suffix = ")"
         var start = 1
-        /// Above and below the separator line, and between notes.
         var spaceAbove = 850
         var spaceBelow = 567
         var spaceBetween = 0
@@ -242,7 +256,6 @@ struct HwpDocument {
         /// The shape at the paragraph's start, which sizes an empty paragraph.
         var charShapeID = 0
         var content: [Inline] = []
-        /// Hangul's own layout when the writer saved it (desktop Hangul does; web and server exports don't).
         var lineSegments: [LineSegment] = []
     }
 
@@ -286,8 +299,12 @@ struct HwpDocument {
 
     /// Placement shared by tables, pictures, shapes and equations (개체 공통 속성).
     struct ObjectLayout {
-        enum Relative { case paper, page, column, paragraph }
-        enum Wrap { case square, tight, through, topAndBottom, behindText, inFrontOfText }
+        enum Relative {
+            case paper, page, column, paragraph
+        }
+        enum Wrap {
+            case square, tight, through, topAndBottom, behindText, inFrontOfText
+        }
 
         var inline = true
         var vertical: Relative = .paragraph
@@ -334,8 +351,7 @@ struct HwpDocument {
         var binID = 0
         /// The part of the image shown, in the image's own units: 75 per pixel (96 dpi in HWPUNIT).
         var crop: (left: Int, top: Int, right: Int, bottom: Int) = (0, 0, 0, 0)
-        /// The image rectangle's far corner. In those same units when the picture was cropped in
-        /// Hangul; otherwise the size it is drawn at.
+        /// The image rectangle's far corner.
         var extent: (width: Int, height: Int) = (0, 0)
         var effect: Effect = .none
         var border: Border = .none
@@ -363,7 +379,9 @@ struct HwpDocument {
     }
 
     struct Shape {
-        enum Kind { case line, rectangle, ellipse, other }
+        enum Kind {
+            case line, rectangle, ellipse, other
+        }
         var layout = ObjectLayout()
         var kind: Kind = .other
         var line: Border = .none
@@ -371,7 +389,6 @@ struct HwpDocument {
         var image: ImageFill?
         /// Radius as a percent of the shorter side, for rounded rectangles.
         var cornerRatio = 0
-        /// Line endpoints in the shape's own box, for `.line`.
         var start = (x: 0, y: 0)
         var end = (x: 0, y: 0)
         var text: [Paragraph] = []
@@ -388,13 +405,17 @@ struct HwpDocument {
     }
 
     struct HeaderFooter {
-        enum Pages { case both, even, odd }
+        enum Pages {
+            case both, even, odd
+        }
         var pages: Pages
         var paragraphs: [Paragraph]
     }
 
     struct AutoNumber {
-        enum Kind { case page, footnote, endnote, picture, table, equation, totalPages }
+        enum Kind {
+            case page, footnote, endnote, picture, table, equation, totalPages
+        }
         var kind: Kind
         var style: Int
         var number: Int
@@ -429,29 +450,47 @@ extension HwpDocument.Border.Style {
     /// HWP 5 line type codes (테두리선 종류); 0 is no line.
     init?(code: Int) {
         switch code {
-        case 1: self = .solid
-        case 2: self = .dash
-        case 3: self = .dot
-        case 4: self = .dashDot
-        case 5: self = .dashDotDot
-        case 6: self = .longDash
-        case 7: self = .circle
-        case 8: self = .double
-        case 9: self = .thinThick
-        case 10: self = .thickThin
-        case 11: self = .triple
-        case 12, 13: self = .wave
-        case 14...17: self = .solid
-        default: return nil
+        case 1:
+            self = .solid
+        case 2:
+            self = .dash
+        case 3:
+            self = .dot
+        case 4:
+            self = .dashDot
+        case 5:
+            self = .dashDotDot
+        case 6:
+            self = .longDash
+        case 7:
+            self = .circle
+        case 8:
+            self = .double
+        case 9:
+            self = .thinThick
+        case 10:
+            self = .thickThin
+        case 11:
+            self = .triple
+        case 12, 13:
+            self = .wave
+        case 14...17:
+            self = .solid
+        default:
+            return nil
         }
     }
 
     var css: String {
         switch self {
-        case .solid, .wave: "solid"
-        case .dash, .longDash, .dashDot, .dashDotDot: "dashed"
-        case .dot, .circle: "dotted"
-        case .double, .thinThick, .thickThin, .triple: "double"
+        case .solid, .wave: 
+            "solid"
+        case .dash, .longDash, .dashDot, .dashDotDot:
+            "dashed"
+        case .dot, .circle: 
+            "dotted"
+        case .double, .thinThick, .thickThin, .triple: 
+            "double"
         }
     }
 }

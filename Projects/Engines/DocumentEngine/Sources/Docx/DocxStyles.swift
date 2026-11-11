@@ -16,7 +16,9 @@ struct RunFormat: Equatable {
     init() {}
 
     init(_ rPr: XMLElement?) {
-        guard let rPr else { return }
+        guard let rPr else {
+            return
+        }
         bold = rPr.child("b")?.isOn
         italic = rPr.child("i")?.isOn
         underline = rPr.child("u").map { $0.value() != "none" }
@@ -24,7 +26,6 @@ struct RunFormat: Equatable {
         color = rPr.child("color")?.value().flatMap { $0 == "auto" ? nil : "#\($0)" }
         sizePt = rPr.child("sz")?.number().map { $0 / 2 }
         if let fonts = rPr.child("rFonts") {
-            // Theme attributes win over explicit names; `DocxTheme.font` resolves the "+" tokens.
             latinFont = fonts.value("asciiTheme").map { "+\($0)" } ?? fonts.value("ascii") ?? fonts.value("hAnsi")
             eastAsiaFont = fonts.value("eastAsiaTheme").map { "+\($0)" } ?? fonts.value("eastAsia")
         }
@@ -96,7 +97,9 @@ struct ParagraphFormat: Equatable {
     init() {}
 
     init(_ pPr: XMLElement?) {
-        guard let pPr else { return }
+        guard let pPr else {
+            return
+        }
         alignment = pPr.child("jc")?.value()
         if let ind = pPr.child("ind") {
             indentLeft = (ind.number("left") ?? ind.number("start")).map(twips)
@@ -112,9 +115,12 @@ struct ParagraphFormat: Equatable {
             spaceAfter = spacing.number("after").map(twips)
             if let line = spacing.number("line") {
                 switch spacing.value("lineRule") {
-                case "exact": lineSpacing = .exactly(twips(line))
-                case "atLeast": lineSpacing = .atLeast(twips(line))
-                default: lineSpacing = .multiple(line / 240)
+                case "exact":
+                    lineSpacing = .exactly(twips(line))
+                case "atLeast":
+                    lineSpacing = .atLeast(twips(line))
+                default:
+                    lineSpacing = .multiple(line / 240)
                 }
             }
         }
@@ -147,7 +153,9 @@ struct ParagraphFormat: Equatable {
             var merged = tabs ?? []
             for stop in added {
                 merged.removeAll { $0.position == stop.position }
-                if stop.kind != "clear" { merged.append(stop) }
+                if stop.kind != "clear" {
+                    merged.append(stop)
+                }
             }
             result.tabs = merged.sorted { $0.position < $1.position }
         }
@@ -162,14 +170,20 @@ struct BorderSide: Equatable {
     /// `nil` for `w:val="nil"`/`none`, which removes an inherited border.
     init?(_ element: XMLElement) {
         let style = element.value() ?? "single"
-        guard !["nil", "none"].contains(style) else { return nil }
+        guard !["nil", "none"].contains(style) else {
+            return nil
+        }
         let width = max((element.number("sz") ?? 4) / 8, 0.25)
         let color = element.value("color").flatMap { $0 == "auto" ? nil : "#\($0)" } ?? "#000000"
         let cssStyle = switch style {
-        case "double": "double"
-        case "dashed", "dashSmallGap", "dotDash", "dotDotDash": "dashed"
-        case "dotted": "dotted"
-        default: "solid"
+        case "double": 
+            "double"
+        case "dashed", "dashSmallGap", "dotDash", "dotDotDash": 
+            "dashed"
+        case "dotted": 
+            "dotted"
+        default: 
+            "solid"
         }
         css = "\(decimal(style == "double" ? max(width, 2.25) : width))pt \(cssStyle) \(color)"
     }
@@ -205,16 +219,19 @@ struct DocxStyles {
     private(set) var defaultParagraph = ParagraphFormat()
 
     init(_ root: XMLElement?) {
-        // Word's built-in defaults when styles.xml says nothing.
         defaultRun.sizePt = 10
         defaultRun.latinFont = "Times New Roman"
-        guard let root else { return }
+        guard let root else {
+            return
+        }
         if let defaults = root.child("docDefaults") {
             defaultRun = defaultRun.overlaid(by: RunFormat(defaults.child("rPrDefault")?.child("rPr")))
             defaultParagraph = ParagraphFormat(defaults.child("pPrDefault")?.child("pPr"))
         }
         for element in root.children("style") {
-            guard let id = element.value("styleId") else { continue }
+            guard let id = element.value("styleId") else {
+                continue
+            }
             var style = Style()
             style.basedOn = element.child("basedOn")?.value()
             style.paragraph = ParagraphFormat(element.child("pPr"))
@@ -223,9 +240,12 @@ struct DocxStyles {
             styles[id] = style
             if element.value("default").map({ $0 == "1" || $0 == "true" }) == true {
                 switch element.value("type") {
-                case "paragraph": defaultParagraphStyle = id
-                case "table": defaultTableStyle = id
-                default: break
+                case "paragraph":
+                    defaultParagraphStyle = id
+                case "table":
+                    defaultTableStyle = id
+                default:
+                    break
                 }
             }
         }
@@ -273,7 +293,9 @@ struct DocxStyles {
     }
 }
 
-func twips(_ value: Double) -> Double { value / 20 }
+func twips(_ value: Double) -> Double {
+    value / 20
+}
 
 /// Points for CSS: at most two decimals, no trailing zeros.
 func decimal(_ value: Double) -> String {

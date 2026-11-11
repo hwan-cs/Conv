@@ -2,9 +2,6 @@ import Foundation
 import PDFKit
 
 /// .docx → paginated PDF: OOXML is read directly into HTML, then laid out by `PagedPDFRenderer`.
-///
-/// Cocoa's own OOXML reader was tried first and drops images, page breaks, heading styles,
-/// numbered lists, and table merges and shading.
 @MainActor
 public struct DocxPDFConverter {
     public enum ConversionError: Error {
@@ -30,7 +27,9 @@ public struct DocxPDFConverter {
         let overlay = work.appending(path: "overlay.pdf")
 
         try await renderer.render(html: document.html, baseURL: nil, to: body, page: document.page, script: script)
-        guard let rendered = PDFDocument(url: body) else { throw ConversionError.unreadableIntermediate }
+        guard let rendered = PDFDocument(url: body) else {
+            throw ConversionError.unreadableIntermediate
+        }
         let starts = Self.sectionStarts(document.headerFooter.sections, in: rendered)
         let overlayHTML = document.headerFooter.overlayHTML(pageCount: rendered.pageCount, sectionStarts: starts)
         try await renderer.render(html: overlayHTML, baseURL: nil, to: overlay, page: document.headerFooter.overlayPage)

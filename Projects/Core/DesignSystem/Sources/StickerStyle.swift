@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The fixed sticker color for a file format. The same format looks the same everywhere in the app.
+/// The fixed sticker color for a file format.
 public struct StickerStyle: Sendable, Equatable {
     public let fill: Color
     public let text: Color

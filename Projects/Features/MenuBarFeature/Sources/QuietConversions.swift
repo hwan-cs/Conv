@@ -17,7 +17,6 @@ public final class QuietConversions: NSObject {
         public let format: String
     }
 
-    /// The batch being converted, with its file index and that file's progress.
     public private(set) var current: Job?
     public private(set) var fileIndex = 0
     public private(set) var fileProgress: Double = 0
@@ -25,16 +24,22 @@ public final class QuietConversions: NSObject {
 
     /// 0…1 over the whole batch in progress.
     public var progress: Double {
-        guard let current else { return 0 }
-        // Files combined into one move together.
-        if isCombining { return fileProgress }
+        guard let current else {
+            return 0
+        }
+
+        if isCombining {
+            return fileProgress
+        }
         return (Double(fileIndex) + fileProgress) / Double(max(current.files.count, 1))
     }
 
     /// Why a file wasn't converted, for the notification.
     private struct Reason: Error {
         let text: String
-        init(_ text: String) { self.text = text }
+        init(_ text: String) {
+            self.text = text
+        }
     }
 
     private var queue: [Job] = []
@@ -46,9 +51,10 @@ public final class QuietConversions: NSObject {
     }
 
     public func convert(_ files: [URL], to format: String) {
-        guard !files.isEmpty else { return }
+        guard !files.isEmpty else {
+            return
+        }
         queue.append(Job(files: files, format: format))
-        // Asked on first use, by those who use Finder's menu.
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         if current == nil { Task { await drain() } }
     }
@@ -62,7 +68,9 @@ public final class QuietConversions: NSObject {
             if Formats.outputs(for: job.files).first(where: { $0.ext == job.format })?.combines == true {
                 isCombining = true
                 fileProgress = 0
-                defer { isCombining = false }
+                defer {
+                    isCombining = false
+                }
                 switch await combine(job.files, to: job.format) {
                 case .success(let output):
                     written.append(output)
@@ -94,7 +102,9 @@ public final class QuietConversions: NSObject {
         let combined: FileHandle
         do {
             combined = try await client.combine(files, to: format) { fraction in
-                Task { @MainActor [weak self] in self?.fileProgress = fraction }
+                Task { @MainActor [weak self] in
+                    self?.fileProgress = fraction
+                }
             }
         } catch let error as ConversionClient.Failure {
             return .failure(Reason(error.description))
@@ -113,7 +123,9 @@ public final class QuietConversions: NSObject {
         let pages: PackedFiles.Reader
         do {
             pages = try await client.convertPages(file, to: format) { fraction in
-                Task { @MainActor [weak self] in self?.fileProgress = fraction }
+                Task { @MainActor [weak self] in
+                    self?.fileProgress = fraction
+                }
             }
         } catch let error as ConversionClient.Failure {
             return .failure(Reason(error.description))
@@ -128,18 +140,24 @@ public final class QuietConversions: NSObject {
     }
 
     private func convert(_ file: URL, to format: String) async -> Result<URL, Reason> {
-        if Formats.splitsPages(file) { return await convertPages(file, to: format) }
+        if Formats.splitsPages(file) {
+            return await convertPages(file, to: format)
+        }
         let converted: FileHandle
         do {
             converted = try await client.convert(file, to: format) { fraction in
-                Task { @MainActor [weak self] in self?.fileProgress = fraction }
+                Task { @MainActor [weak self] in
+                    self?.fileProgress = fraction
+                }
             }
         } catch let error as ConversionClient.Failure {
             return .failure(Reason(error.description))
         } catch {
             return .failure(Reason("파일을 읽을 수 없어요"))
         }
-        defer { try? converted.close() }
+        defer {
+            try? converted.close()
+        }
         do {
             return .success(try SiblingWriter.copyKeepingBoth(converted, nextTo: file, extension: format))
         } catch {
@@ -163,7 +181,6 @@ public final class QuietConversions: NSObject {
             content.title = "\(job.files.count)개 중 \(written.count)개를 \(format)로 바꿨어요"
             content.body = failures.map { "\($0.0.lastPathComponent): \($0.1)" }.joined(separator: "\n")
         }
-        // A click shows the results, or the originals if none were made.
         content.userInfo = ["reveal": (written.isEmpty ? job.files : written).map(\.path)]
         content.sound = failures.isEmpty ? nil : .default
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: job.id.uuidString, content: content, trigger: nil))

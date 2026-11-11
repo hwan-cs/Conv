@@ -3,17 +3,13 @@ import ZIPFoundation
 
 /// Builds an `HwpDocument` from a .hwpx package (OWPML, KS X 6101): a ZIP of XML parts that
 /// carry the same model as the binary records.
-///
-/// Hangul also saves .hwpx under a .hwp name, so packages are told apart by content, not extension.
 struct HwpxReader {
     enum ReaderError: Error {
         case notAnHwpx
     }
 
     private let archive: Archive
-    /// Package paths of embedded files by their manifest id ("image1").
     private var manifest: [String: String] = [:]
-    /// Manifest ids mapped to the integer ids the model uses.
     private var binIDs: [String: Int] = [:]
 
     init(url: URL) throws {
@@ -22,12 +18,18 @@ struct HwpxReader {
         } catch {
             throw ReaderError.notAnHwpx
         }
-        guard archive["Contents/header.xml"] != nil else { throw ReaderError.notAnHwpx }
+        guard archive["Contents/header.xml"] != nil else {
+            throw ReaderError.notAnHwpx
+        }
     }
 
     static func isPackage(_ url: URL) -> Bool {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
-        defer { try? handle.close() }
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            return false
+        }
+        defer {
+            try? handle.close()
+        }
         return (try? handle.read(upToCount: 2)) == Data("PK".utf8)
     }
 
@@ -36,21 +38,25 @@ struct HwpxReader {
         var sections: [String] = []
         if let package = try xml("Contents/content.hpf") {
             for item in package.descendants(named: "item") {
-                guard let id = item.string("id"), let href = item.string("href") else { continue }
+                guard let id = item.string("id"), let href = item.string("href") else {
+                    continue
+                }
                 if href.hasPrefix("BinData/") {
                     manifest[id] = href
                 } else if id.hasPrefix("section") || href.contains("section") {
                     sections.append(href)
                 }
             }
-            // The spine keeps sections in reading order.
+
             let order = package.descendants(named: "itemref").compactMap { $0.string("idref") }
             if !order.isEmpty {
                 let byID = Dictionary(package.descendants(named: "item").compactMap { item in
                     item.string("id").flatMap { id in item.string("href").map { (id, $0) } }
                 }, uniquingKeysWith: { first, _ in first })
                 let spine = order.compactMap { byID[$0] }.filter { $0.contains("section") }
-                if !spine.isEmpty { sections = spine }
+                if !spine.isEmpty {
+                    sections = spine
+                }
             }
         }
         if sections.isEmpty {
@@ -65,10 +71,14 @@ struct HwpxReader {
             }
         }
 
-        guard let header = try xml("Contents/header.xml") else { throw ReaderError.notAnHwpx }
+        guard let header = try xml("Contents/header.xml") else {
+            throw ReaderError.notAnHwpx
+        }
         readHeader(header, into: &document)
         for path in sections {
-            guard let root = try xml(path) else { continue }
+            guard let root = try xml(path) else {
+                continue
+            }
             var section = HwpDocument.Section()
             section.paragraphs = root.elements.filter { $0.localName == "p" }.map { paragraph($0, section: &section) }
             document.sections.append(section)
@@ -77,11 +87,12 @@ struct HwpxReader {
     }
 
     // MARK: Header
-
     private func readHeader(_ header: XMLElement, into document: inout HwpDocument) {
         let scripts = ["HANGUL", "LATIN", "HANJA", "JAPANESE", "OTHER", "SYMBOL", "USER"]
         for fontface in header.descendants(named: "fontface") {
-            guard let script = scripts.firstIndex(of: fontface.string("lang") ?? "") else { continue }
+            guard let script = scripts.firstIndex(of: fontface.string("lang") ?? "") else {
+                continue
+            }
             document.fonts[script] = fontface.children(named: "font").sorted { $0.int("id") < $1.int("id") }.map { font in
                 HwpDocument.Font(name: font.string("face") ?? "", fallback: font.child(named: "substFont")?.string("face"))
             }
@@ -91,7 +102,9 @@ struct HwpxReader {
         document.tabDefs = header.descendants(named: "tabPr").sorted { $0.int("id") < $1.int("id") }.map(tabDef)
         document.numberings = header.descendants(named: "numbering").sorted { $0.int("id") < $1.int("id") }.map { numbering in
             var levels = numbering.children(named: "paraHead").sorted { $0.int("level") < $1.int("level") }.map(level)
-            while levels.count < 7 { levels.append(.init(format: "", style: 0, start: 1)) }
+            while levels.count < 7 {
+                levels.append(.init(format: "", style: 0, start: 1))
+            }
             return HwpDocument.Numbering(levels: levels)
         }
         document.bullets = header.descendants(named: "bullet").sorted { $0.int("id") < $1.int("id") }.map { bullet in
@@ -102,7 +115,9 @@ struct HwpxReader {
 
     private func borderFill(_ element: XMLElement) -> HwpDocument.BorderFill {
         func side(_ name: String) -> HwpDocument.Border {
-            guard let border = element.child(named: name) else { return .none }
+            guard let border = element.child(named: name) else {
+                return .none
+            }
             let width = Double((border.string("width") ?? "0.1").split(separator: " ").first ?? "0.1") ?? 0.1
             return HwpDocument.Border(
                 style: Self.lineStyle(border.string("type")),
@@ -124,7 +139,9 @@ struct HwpxReader {
     private func charShape(_ element: XMLElement) -> HwpDocument.CharShape {
         func perScript(_ name: String, default value: Int) -> [Int] {
             let keys = ["hangul", "latin", "hanja", "japanese", "other", "symbol", "user"]
-            guard let item = element.child(named: name) else { return Array(repeating: value, count: 7) }
+            guard let item = element.child(named: name) else {
+                return Array(repeating: value, count: 7)
+            }
             return keys.map { item.string($0).flatMap(Int.init) ?? value }
         }
         let underline: HwpDocument.CharShape.Underline? = switch element.child(named: "underline")?.string("type") {
@@ -237,7 +254,6 @@ struct HwpxReader {
     }
 
     // MARK: Body
-
     private func paragraphs(in list: XMLElement?) -> [HwpDocument.Paragraph] {
         var ignored = HwpDocument.Section()
         return (list?.elements ?? []).filter { $0.localName == "p" }.map { paragraph($0, section: &ignored) }
@@ -265,7 +281,6 @@ struct HwpxReader {
         let runs = element.children(named: "run")
         paragraph.charShapeID = runs.first?.int("charPrIDRef") ?? 0
 
-        // Positions count UTF-16 units, with tabs and controls eight wide, as in the binary format.
         var builder = ContentBuilder(lineStarts: Set(paragraph.lineSegments.map(\.textStart).filter { $0 > 0 }))
         for run in runs {
             let shapeID = run.int("charPrIDRef")
@@ -275,12 +290,18 @@ struct HwpxReader {
                     for node in child.children ?? [] {
                         if let element = node as? XMLElement {
                             switch element.localName {
-                            case "tab": builder.append(.tab(charShapeID: shapeID), width: 8)
-                            case "lineBreak": builder.append(.lineBreak, width: 1)
-                            case "nbSpace": builder.text("\u{00A0}", shapeID: shapeID)
-                            case "fwSpace": builder.text("\u{2007}", shapeID: shapeID)
-                            case "hyphen": builder.text("-", shapeID: shapeID)
-                            default: break
+                            case "tab":
+                                builder.append(.tab(charShapeID: shapeID), width: 8)
+                            case "lineBreak":
+                                builder.append(.lineBreak, width: 1)
+                            case "nbSpace":
+                                builder.text("\u{00A0}", shapeID: shapeID)
+                            case "fwSpace":
+                                builder.text("\u{2007}", shapeID: shapeID)
+                            case "hyphen":
+                                builder.text("-", shapeID: shapeID)
+                            default:
+                                break
                             }
                         } else if let text = node.stringValue {
                             builder.text(text.replacingOccurrences(of: Self.blankTextMarker, with: ""), shapeID: shapeID)
@@ -339,9 +360,11 @@ struct HwpxReader {
                 page.footer = margin.int("footer")
                 page.gutter = margin.int("gutter")
             }
-            // WIDELY is portrait (가로로 넓게 is how Hangul describes it); NARROWLY turns the paper.
+
             page.landscape = pagePr.string("landscape") == "NARROWLY"
-            if page.landscape, page.width < page.height { swap(&page.width, &page.height) }
+            if page.landscape, page.width < page.height {
+                swap(&page.width, &page.height)
+            }
             section.page = page
         }
     }
@@ -350,7 +373,9 @@ struct HwpxReader {
         switch element.localName {
         case "colPr":
             section.columns = max(element.int("colCount", default: 1), 1)
-            if let gap = element.string("sameGap").flatMap(Int.init), gap > 0 { section.columnGap = gap }
+            if let gap = element.string("sameGap").flatMap(Int.init), gap > 0 {
+                section.columnGap = gap
+            }
             return nil
         case "header", "footer":
             let pages: HwpDocument.HeaderFooter.Pages = switch element.string("applyPageType") {
@@ -392,7 +417,9 @@ struct HwpxReader {
                 pageNumber: element.string("hidePageNum") == "1"
             )
         case "fieldBegin":
-            guard element.string("type") == "HYPERLINK" else { return nil }
+            guard element.string("type") == "HYPERLINK" else {
+                return nil
+            }
             let command = element.descendants(named: "stringParam").first { $0.string("name") == "Command" }?.stringValue ?? ""
             return .hyperlink(command.split(separator: ";").first.map { $0.replacingOccurrences(of: "\\:", with: ":") } ?? "")
         case "fieldEnd":
@@ -423,9 +450,12 @@ struct HwpxReader {
                     cell.borderFillID = cellElement.int("borderFillIDRef")
                     let list = cellElement.child(named: "subList")
                     cell.verticalAlign = switch list?.string("vertAlign") {
-                    case "CENTER": 1
-                    case "BOTTOM": 2
-                    default: 0
+                    case "CENTER":
+                        1
+                    case "BOTTOM":
+                        2
+                    default:
+                        0
                     }
                     cell.paragraphs = paragraphs(in: list)
                     cell.column = cellElement.child(named: "cellAddr")?.int("colAddr") ?? 0
@@ -470,7 +500,9 @@ struct HwpxReader {
 
     /// 그림 채우기: `<hc:imgBrush mode="…"><hc:img binaryItemIDRef="…"/>`.
     private func imageFill(_ brush: XMLElement?) -> HwpDocument.ImageFill? {
-        guard let brush, let id = brush.descendant(named: "img")?.string("binaryItemIDRef"), let binID = binIDs[id] else { return nil }
+        guard let brush, let id = brush.descendant(named: "img")?.string("binaryItemIDRef"), let binID = binIDs[id] else {
+            return nil
+        }
         let mode: HwpDocument.ImageFill.Mode = switch brush.string("mode") {
         case "TILE", "TILE_HORZ_TOP", "TILE_HORZ_BOTTOM", "TILE_VERT_LEFT", "TILE_VERT_RIGHT": .tile
         case "TOTAL", "FIT_TO_SIZE": .stretch
@@ -498,7 +530,9 @@ struct HwpxReader {
             shape.end = (end?.int("x") ?? 0, end?.int("y") ?? 0)
         case "container":
             shape.children = element.elements.compactMap { child -> HwpDocument.Control? in
-                guard ["rect", "ellipse", "line", "pic", "container", "arc", "polygon", "curve"].contains(child.localName ?? "") else { return nil }
+                guard ["rect", "ellipse", "line", "pic", "container", "arc", "polygon", "curve"].contains(child.localName ?? "") else {
+                    return nil
+                }
                 var layout = HwpDocument.ObjectLayout()
                 layout.inline = false
                 layout.x = child.child(named: "offset")?.int("x") ?? 0
@@ -519,9 +553,12 @@ struct HwpxReader {
         if let text = element.child(named: "drawText") {
             shape.text = paragraphs(in: text.child(named: "subList"))
             shape.textVerticalAlign = switch text.child(named: "subList")?.string("vertAlign") {
-            case "CENTER": 1
-            case "BOTTOM": 2
-            default: 0
+            case "CENTER":
+                1
+            case "BOTTOM":
+                2
+            default:
+                0
             }
             if let margin = text.child(named: "textMargin") {
                 shape.textPadding = (margin.int("left"), margin.int("right"), margin.int("top"), margin.int("bottom"))
@@ -573,9 +610,13 @@ struct HwpxReader {
     // MARK: Values
 
     private static func line(_ element: XMLElement?) -> HwpDocument.Border {
-        guard let element, let style = lineStyle(element.string("style")) else { return .none }
+        guard let element, let style = lineStyle(element.string("style")) else {
+            return .none
+        }
         let width = element.int("width")
-        guard width > 0 else { return .none }
+        guard width > 0 else {
+            return .none
+        }
         return .init(style: style, width: Double(width) / 283.465, color: color(element.string("color")) ?? .black)
     }
 
@@ -599,7 +640,9 @@ struct HwpxReader {
 
     /// "#RRGGBB"; "none" and absent colors are nil.
     static func color(_ value: String?) -> HwpDocument.Color? {
-        guard let value, value.hasPrefix("#"), value.count == 7, let number = UInt32(value.dropFirst(), radix: 16) else { return nil }
+        guard let value, value.hasPrefix("#"), value.count == 7, let number = UInt32(value.dropFirst(), radix: 16) else {
+            return nil
+        }
         return .init(red: UInt8(number >> 16 & 0xFF), green: UInt8(number >> 8 & 0xFF), blue: UInt8(number & 0xFF))
     }
 
@@ -623,11 +666,12 @@ struct HwpxReader {
     }
 
     // MARK: Package
-
     static let blankTextMarker = "\u{E000}"
 
     private func xml(_ path: String) throws -> XMLElement? {
-        guard let data = try Self.data(in: archive, at: path) else { return nil }
+        guard let data = try Self.data(in: archive, at: path) else {
+            return nil
+        }
         return try XMLDocument(data: Self.protectingBlankText(data)).rootElement()
     }
 
@@ -635,9 +679,13 @@ struct HwpxReader {
     /// between runs as exactly that; they are marked so they survive, and the marker is stripped on read.
     static func protectingBlankText(_ data: Data) -> Data {
         // Spaces right after <hp:t> or an empty element such as <hp:tab/>, up to the next tag.
-        guard let blankText = try? Regex(#"(<hp:t(?: [^>]*)?>|<hp:[a-zA-Z]+/>)([ \t\x{3000}]+)(<)"#) else { return data }
+        guard let blankText = try? Regex(#"(<hp:t(?: [^>]*)?>|<hp:[a-zA-Z]+/>)([ \t\x{3000}]+)(<)"#) else {
+            return data
+        }
         let xml = String(decoding: data, as: UTF8.self)
-        guard xml.contains(blankText) else { return data }
+        guard xml.contains(blankText) else {
+            return data
+        }
         return Data(xml.replacing(blankText) { match in
             let whole = String(xml[match.range])
             let tagEnd = whole.firstIndex(of: ">").map { whole.index(after: $0) } ?? whole.startIndex
@@ -646,7 +694,9 @@ struct HwpxReader {
     }
 
     private static func data(in archive: Archive, at path: String) throws -> Data? {
-        guard let entry = archive[path] else { return nil }
+        guard let entry = archive[path] else {
+            return nil
+        }
         var data = Data()
         _ = try archive.extract(entry) { data.append($0) }
         return data
@@ -677,7 +727,9 @@ private struct ContentBuilder {
     }
 
     mutating func append(_ item: HwpDocument.Inline, width: Int) {
-        if lineStarts.contains(position), position > 0 { content.append(.lineStart) }
+        if lineStarts.contains(position), position > 0 {
+            content.append(.lineStart)
+        }
         content.append(item)
         position += width
     }
@@ -687,7 +739,9 @@ private struct ContentBuilder {
     }
 
     private mutating func flush(_ pending: inout String, shapeID: Int) {
-        guard !pending.isEmpty else { return }
+        guard !pending.isEmpty else {
+            return
+        }
         if case .text(let previous, let previousShape) = content.last, previousShape == shapeID {
             content[content.count - 1] = .text(previous + pending, charShapeID: shapeID)
         } else {
@@ -708,8 +762,12 @@ private extension XMLElement {
 
     func descendant(named name: String) -> XMLElement? {
         for element in elements {
-            if element.localName == name { return element }
-            if let found = element.descendant(named: name) { return found }
+            if element.localName == name {
+                return element
+            }
+            if let found = element.descendant(named: name) {
+                return found
+            }
         }
         return nil
     }

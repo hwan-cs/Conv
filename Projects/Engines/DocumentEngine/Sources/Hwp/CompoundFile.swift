@@ -38,7 +38,9 @@ struct CompoundFile {
         }
         self.data = data
         let shift = Int(data.uint16(at: 0x1E))
-        guard (9...12).contains(shift) else { throw FileError.corrupt }
+        guard (9...12).contains(shift) else {
+            throw FileError.corrupt
+        }
         sectorSize = 1 << shift
         miniCutoff = Int(data.uint32(at: 0x38))
 
@@ -49,7 +51,9 @@ struct CompoundFile {
         let perSector = sectorSize / 4
         while difat < Self.endOfChain, guardCount < 1 << 16 {
             let offset = (Int(difat) + 1) * sectorSize
-            guard offset + sectorSize <= data.count else { throw FileError.corrupt }
+            guard offset + sectorSize <= data.count else {
+                throw FileError.corrupt
+            }
             fatSectors += (0..<perSector - 1).map { data.uint32(at: offset + $0 * 4) }
             difat = data.uint32(at: offset + (perSector - 1) * 4)
             guardCount += 1
@@ -58,7 +62,9 @@ struct CompoundFile {
         var fat: [UInt32] = []
         for sector in fatSectors.prefix(fatCount) where sector < Self.endOfChain {
             let offset = (Int(sector) + 1) * sectorSize
-            guard offset + sectorSize <= data.count else { throw FileError.corrupt }
+            guard offset + sectorSize <= data.count else {
+                throw FileError.corrupt
+            }
             fat += (0..<perSector).map { data.uint32(at: offset + $0 * 4) }
         }
         self.fat = fat
@@ -77,7 +83,9 @@ struct CompoundFile {
                 size: Int(directory.uint32(at: offset + 0x78))
             )
         }
-        guard let root = entries.first, root.type == 5 else { throw FileError.corrupt }
+        guard let root = entries.first, root.type == 5 else {
+            throw FileError.corrupt
+        }
 
         let miniFATData = try Self.chain(from: data.uint32(at: 0x3C), fat: fat, sectorSize: sectorSize, in: data)
         miniFAT = (0..<miniFATData.count / 4).map { miniFATData.uint32(at: $0 * 4) }
@@ -92,10 +100,14 @@ struct CompoundFile {
     func stream(_ path: String) throws -> Data? {
         var entry = entries[0]
         for name in path.split(separator: "/") {
-            guard let found = child(named: String(name), of: entry) else { return nil }
+            guard let found = child(named: String(name), of: entry) else {
+                return nil
+            }
             entry = found
         }
-        guard entry.type == 2 else { return nil }
+        guard entry.type == 2 else {
+            return nil
+        }
         if entry.size < miniCutoff {
             return try Self.chain(from: entry.start, fat: miniFAT, sectorSize: 64, in: miniStream, headerSectors: 0)
                 .prefix(entry.size)
@@ -107,14 +119,18 @@ struct CompoundFile {
     func names(in path: String = "") -> [String] {
         var entry = entries[0]
         for name in path.split(separator: "/") {
-            guard let found = child(named: String(name), of: entry) else { return [] }
+            guard let found = child(named: String(name), of: entry) else {
+                return []
+            }
             entry = found
         }
         var result: [String] = []
         var stack = [entry.child]
         var visited = Set<UInt32>()
         while let id = stack.popLast() {
-            guard id != Self.noStream, Int(id) < entries.count, visited.insert(id).inserted else { continue }
+            guard id != Self.noStream, Int(id) < entries.count, visited.insert(id).inserted else {
+                continue
+            }
             result.append(entries[Int(id)].name)
             stack += [entries[Int(id)].left, entries[Int(id)].right]
         }
@@ -122,13 +138,16 @@ struct CompoundFile {
     }
 
     private func child(named name: String, of storage: Entry) -> Entry? {
-        // Siblings are a red-black tree ordered by length then uppercase name; a walk is simpler and as fast here.
         var stack = [storage.child]
         var visited = Set<UInt32>()
         while let id = stack.popLast() {
-            guard id != Self.noStream, Int(id) < entries.count, visited.insert(id).inserted else { continue }
+            guard id != Self.noStream, Int(id) < entries.count, visited.insert(id).inserted else {
+                continue
+            }
             let entry = entries[Int(id)]
-            if entry.name.caseInsensitiveCompare(name) == .orderedSame { return entry }
+            if entry.name.caseInsensitiveCompare(name) == .orderedSame {
+                return entry
+            }
             stack += [entry.left, entry.right]
         }
         return nil
@@ -160,13 +179,17 @@ struct CompoundFile {
 
 extension Data {
     func uint16(at offset: Int) -> UInt16 {
-        guard offset >= 0, offset + 2 <= count else { return 0 }
+        guard offset >= 0, offset + 2 <= count else {
+            return 0
+        }
         let i = startIndex + offset
         return UInt16(self[i]) | UInt16(self[i + 1]) << 8
     }
 
     func uint32(at offset: Int) -> UInt32 {
-        guard offset >= 0, offset + 4 <= count else { return 0 }
+        guard offset >= 0, offset + 4 <= count else {
+            return 0
+        }
         let i = startIndex + offset
         return UInt32(self[i]) | UInt32(self[i + 1]) << 8 | UInt32(self[i + 2]) << 16 | UInt32(self[i + 3]) << 24
     }

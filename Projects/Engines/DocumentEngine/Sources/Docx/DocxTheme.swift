@@ -12,7 +12,9 @@ struct DocxTheme {
     private var colors: [String: String] = [:]
 
     init(_ root: XMLElement?) {
-        guard let themeElements = root?.child("themeElements", in: OOXMLNamespace.a) else { return }
+        guard let themeElements = root?.child("themeElements", in: OOXMLNamespace.a) else {
+            return
+        }
         if let fonts = themeElements.child("fontScheme", in: OOXMLNamespace.a) {
             minor = Self.fonts(fonts.child("minorFont", in: OOXMLNamespace.a))
             major = Self.fonts(fonts.child("majorFont", in: OOXMLNamespace.a))
@@ -28,7 +30,9 @@ struct DocxTheme {
 
     /// Resolves a `+minorHAnsi`-style token written by `RunFormat`; other names pass through.
     func font(_ name: String?) -> String? {
-        guard let name, name.hasPrefix("+") else { return name }
+        guard let name, name.hasPrefix("+") else {
+            return name
+        }
         let pair = name.dropFirst().hasPrefix("major") ? major : minor
         return name.hasSuffix("EastAsia") ? (pair.eastAsia ?? pair.latin) : (pair.latin ?? pair.eastAsia)
     }
@@ -47,7 +51,6 @@ struct DocxTheme {
             .first { $0.attribute(forName: "script")?.stringValue == "Hang" }
         return FontPair(
             latin: typeface(element?.child("latin", in: OOXMLNamespace.a)),
-            // Korean documents leave <a:ea> empty and name the Hangul face per script.
             eastAsia: typeface(element?.child("ea", in: OOXMLNamespace.a)) ?? typeface(hangul)
         )
     }

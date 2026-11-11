@@ -1,10 +1,7 @@
 import Foundation
 
 /// Several files in one stream, for a conversion whose result is more than one file: a PDF's
-/// pages as images. One handle crosses XPC where hundreds would run out of file descriptors.
-///
-/// "CONVPACK1", the file count (UInt32), then each file as its length (UInt64) and bytes; all
-/// big-endian.
+/// pages as images.
 public enum PackedFiles {
     static let magic = Data("CONVPACK1".utf8)
 
@@ -31,13 +28,17 @@ public enum PackedFiles {
         }
 
         public func append(_ data: Data) throws {
-            guard written < count else { throw PackError.countMismatch }
+            guard written < count else {
+                throw PackError.countMismatch
+            }
             try output.write(contentsOf: PackedFiles.bytes(UInt64(data.count)) + data)
             written += 1
         }
 
         public func finish() throws {
-            guard written == count else { throw PackError.countMismatch }
+            guard written == count else {
+                throw PackError.countMismatch
+            }
             try output.close()
         }
     }
@@ -64,10 +65,14 @@ public enum PackedFiles {
             try handle.seek(toOffset: start)
             for index in 0..<count {
                 let length = try handle.read(upToCount: 8) ?? Data()
-                guard length.count == 8 else { throw PackError.malformed }
+                guard length.count == 8 else {
+                    throw PackError.malformed
+                }
                 let size = Int(PackedFiles.integer(length))
                 let data = size == 0 ? Data() : try handle.read(upToCount: size) ?? Data()
-                guard data.count == size else { throw PackError.malformed }
+                guard data.count == size else {
+                    throw PackError.malformed
+                }
                 try body(index, data)
             }
         }

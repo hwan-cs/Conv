@@ -1,15 +1,12 @@
 import Foundation
 
 /// Third-party code and fonts that ship inside Conv, with the notices their licenses require.
-/// Each `file` is a license text in Resources/Licenses.
 struct OpenSourceLicense: Identifiable, Sendable {
     let name: String
-    /// What Conv uses it for.
     let usage: String
     let license: String
     let source: URL
     let file: String
-    /// Further terms the license asks to be stated, such as how to replace an LGPL library.
     var note: String?
 
     var id: String { name }
@@ -18,7 +15,9 @@ struct OpenSourceLicense: Identifiable, Sendable {
         guard let url = Bundle.module.url(forResource: file, withExtension: "txt", subdirectory: "Licenses")
             ?? Bundle.module.url(forResource: file, withExtension: "txt"),
             let text = try? String(contentsOf: url, encoding: .utf8)
-        else { return "" }
+        else {
+            return ""
+        }
         return text
     }
 
