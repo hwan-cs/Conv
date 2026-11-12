@@ -26,6 +26,7 @@ public enum Formats {
     public static let audioInputs: Set<String> = ["m4a", "mp3", "wav", "aiff", "aif", "caf", "aac", "flac"]
     public static var mediaInputs: Set<String> { videoInputs.union(audioInputs) }
     public static let pdfInputs: Set<String> = ["pdf"]
+    public static let sheetInputs: Set<String> = ["csv", "xlsx"]
 
     /// Formats every one of the files can become, best first. Several images or PDFs can also become one PDF together.
     public static func outputs(for files: [URL]) -> [Output] {
@@ -69,6 +70,17 @@ public enum Formats {
             return [
                 Output(ext: "jpg", caption: "추천 - 쪽마다 한 장씩"),
                 Output(ext: "png", caption: "쪽마다 한 장씩, 글자가 더 또렷하게"),
+            ]
+        }
+        if ext == "csv" {
+            return [
+                Output(ext: "xlsx", caption: "추천 - 엑셀에서 한글이 안 깨져요"),
+            ]
+        }
+        if ext == "xlsx" {
+            return [
+                Output(ext: "pdf", caption: "추천 - 인쇄/공유용, 엑셀에서 인쇄하듯이"),
+                Output(ext: "csv", caption: "열려 있던 시트의 값만"),
             ]
         }
         if markdownInputs.contains(ext) {

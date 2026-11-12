@@ -74,7 +74,7 @@ struct DocxPackage {
         return Data(xml.replacing(blankText) { "\($0.1)\(blankTextMarker)\($0.2)\($0.3)" }.utf8)
     }
 
-    private static func data(in archive: Archive, at path: String) throws -> Data? {
+    static func data(in archive: Archive, at path: String) throws -> Data? {
         guard let entry = archive[path] else {
             return nil
         }
@@ -100,13 +100,13 @@ struct DocxPackage {
     }
 
     /// `word/document.xml` → `word/_rels/document.xml.rels`; the package itself → `_rels/.rels`.
-    private static func relsPath(for part: String) -> String {
+    static func relsPath(for part: String) -> String {
         let url = URL(filePath: "/" + part)
         let directory = part.isEmpty ? "" : url.deletingLastPathComponent().path().dropFirst()
         return "\(directory)_rels/\(part.isEmpty ? "" : url.lastPathComponent).rels"
     }
 
-    private static func resolve(_ target: String, relativeTo part: String) -> String {
+    static func resolve(_ target: String, relativeTo part: String) -> String {
         if target.hasPrefix("/") {
             return String(target.dropFirst())
         }

@@ -26,6 +26,8 @@ let documentTypes: Plist.Value = [
         "LSItemContentTypes": [
             "org.openxmlformats.wordprocessingml.document", "net.daringfireball.markdown",
             "public.image", "public.movie", "public.audio",
+            "public.comma-separated-values-text",
+            "org.openxmlformats.spreadsheetml.sheet",
         ],
         // HWP has no system type to name.
         "CFBundleTypeExtensions": ["hwp", "hwpx"],
@@ -38,6 +40,8 @@ let documentTypes: Plist.Value = [
             "com.microsoft.bmp", "public.avif", "public.mpeg-4", "com.apple.quicktime-movie",
             "com.apple.m4a-audio", "public.mp3", "com.microsoft.waveform-audio", "public.aiff-audio", "public.html",
             "org.openxmlformats.wordprocessingml.document",
+            "org.openxmlformats.spreadsheetml.sheet",
+            "public.comma-separated-values-text",
         ],
         "NSIsRelatedItemType": true,
     ],

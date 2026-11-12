@@ -69,6 +69,14 @@ extension ConversionServiceImpl {
                 switch (ext, format) {
                 case _ where Formats.imageInputs.contains(ext):
                     try ImageConverter().convert(source, to: output)
+                case _ where Formats.sheetInputs.contains(ext):
+                    let title = ((name as NSString).lastPathComponent as NSString).deletingPathExtension
+                    try await SheetConverter().convert(
+                        source,
+                        to: output,
+                        title: title,
+                        progress: progress
+                    )
                 case _ where Formats.mediaInputs.contains(ext):
                     try await MediaConverter().convert(source, to: output, progress: progress)
                 case _ where Formats.markdownInputs.contains(ext):
@@ -175,18 +183,36 @@ extension ConversionServiceImpl {
 
     private static func message(for error: Error) -> String {
         switch error {
-        case HwpPDFConverter.ConversionError.passwordProtected: "암호가 걸린 HWP는 바꿀 수 없어요"
-        case HwpPDFConverter.ConversionError.unsupportedVersion(let version): "HWP \(version) 형식은 아직 못 읽어요"
-        case HwpPDFConverter.ConversionError.unreadableDocument: "HWP 파일이 아니거나 손상됐어요"
-        case PDFEngine.ConversionError.passwordProtected: "암호가 걸린 PDF는 바꿀 수 없어요"
-        case PDFEngine.ConversionError.unreadable: "PDF 파일이 아니거나 손상됐어요"
-        case PDFEngine.ConversionError.unsupportedOutput(let ext): "PDF를 \(ext.uppercased())로는 아직 못 바꿔요"
-        case ImageConverter.ConversionError.unreadable: "이미지를 읽을 수 없어요"
-        case ImageConverter.ConversionError.unsupportedOutput(let ext): "\(ext.uppercased())로는 아직 저장할 수 없어요"
-        case MediaConverter.ConversionError.unreadable: "영상이나 소리를 읽을 수 없어요"
-        case MediaConverter.ConversionError.noAudio: "소리가 없는 파일이에요"
-        case MediaConverter.ConversionError.exportFailed(let reason): "변환하지 못했어요 (\(reason))"
-        default: "변환하지 못했어요 (\(error))"
+        case HwpPDFConverter.ConversionError.passwordProtected:
+            "암호가 걸린 HWP는 바꿀 수 없어요"
+        case HwpPDFConverter.ConversionError.unsupportedVersion(let version):
+            "HWP \(version) 형식은 아직 못 읽어요"
+        case HwpPDFConverter.ConversionError.unreadableDocument:
+            "HWP 파일이 아니거나 손상됐어요"
+        case PDFEngine.ConversionError.passwordProtected:
+            "암호가 걸린 PDF는 바꿀 수 없어요"
+        case PDFEngine.ConversionError.unreadable:
+            "PDF 파일이 아니거나 손상됐어요"
+        case PDFEngine.ConversionError.unsupportedOutput(let ext):
+            "PDF를 \(ext.uppercased())로는 아직 못 바꿔요"
+        case ImageConverter.ConversionError.unreadable:
+            "이미지를 읽을 수 없어요"
+        case ImageConverter.ConversionError.unsupportedOutput(let ext):
+            "\(ext.uppercased())로는 아직 저장할 수 없어요"
+        case SheetConverter.ConversionError.unreadable:
+            "표 파일이 아니거나 손상됐어요"
+        case SheetConverter.ConversionError.empty:
+            "시트가 비어 있어서 바꿀 게 없어요"
+        case SheetConverter.ConversionError.tooLarge:
+            "엑셀 한 시트에 담기에는 너무 커요"
+        case MediaConverter.ConversionError.unreadable:
+            "영상이나 소리를 읽을 수 없어요"
+        case MediaConverter.ConversionError.noAudio:
+            "소리가 없는 파일이에요"
+        case MediaConverter.ConversionError.exportFailed(let reason):
+            "변환하지 못했어요 (\(reason))"
+        default:
+            "변환하지 못했어요 (\(error))"
         }
     }
 }

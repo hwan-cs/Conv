@@ -20,6 +20,16 @@ public struct StickerStyle: Sendable, Equatable {
         case "webp", "avif": StickerStyle(fill: Color(hex: 0xC9B6FF), text: ConvColor.ink)
         case "hwp", "hwpx": StickerStyle(fill: Color(hex: 0x13A8B8), text: ConvColor.white)
         case "docx", "doc", "rtf": StickerStyle(fill: Color(hex: 0x1F3A93), text: ConvColor.white)
+        case "xlsx":
+            StickerStyle(
+                fill: Color(hex: 0x1D6F42),
+                text: ConvColor.white
+            )
+        case "csv":
+            StickerStyle(
+                fill: Color(hex: 0xB8E2A6),
+                text: ConvColor.ink
+            )
         case "mp4": StickerStyle(fill: Color(hex: 0xFF8CC2), text: ConvColor.ink)
         case "mov": StickerStyle(fill: Color(hex: 0xFFB27A), text: ConvColor.ink)
         case "mp3", "m4a", "wav", "flac": StickerStyle(fill: Color(hex: 0xE9DFC9), text: ConvColor.ink)
