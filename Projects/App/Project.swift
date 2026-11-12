@@ -60,6 +60,7 @@ let app = Target.target(
         "CFBundleDocumentTypes": documentTypes,
     ]) { $1 }),
     sources: ["App/Sources/**"],
+    resources: ["App/Resources/**"],
     entitlements: sandbox,
     dependencies: [
         .module(.dropFeature),
