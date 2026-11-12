@@ -30,6 +30,11 @@ public struct StickerStyle: Sendable, Equatable {
                 fill: Color(hex: 0xB8E2A6),
                 text: ConvColor.ink
             )
+        case "svg":
+            StickerStyle(
+                fill: Color(hex: 0xFF7A59),
+                text: ConvColor.ink
+            )
         case "mp4": StickerStyle(fill: Color(hex: 0xFF8CC2), text: ConvColor.ink)
         case "mov": StickerStyle(fill: Color(hex: 0xFFB27A), text: ConvColor.ink)
         case "mp3", "m4a", "wav", "flac": StickerStyle(fill: Color(hex: 0xE9DFC9), text: ConvColor.ink)

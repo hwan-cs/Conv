@@ -28,6 +28,7 @@ let documentTypes: Plist.Value = [
             "public.image", "public.movie", "public.audio",
             "public.comma-separated-values-text",
             "org.openxmlformats.spreadsheetml.sheet",
+            "public.svg-image",
         ],
         // HWP has no system type to name.
         "CFBundleTypeExtensions": ["hwp", "hwpx"],

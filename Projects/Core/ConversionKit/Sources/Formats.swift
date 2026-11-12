@@ -27,6 +27,7 @@ public enum Formats {
     public static var mediaInputs: Set<String> { videoInputs.union(audioInputs) }
     public static let pdfInputs: Set<String> = ["pdf"]
     public static let sheetInputs: Set<String> = ["csv", "xlsx"]
+    public static let svgInputs: Set<String> = ["svg"]
 
     /// Formats every one of the files can become, best first. Several images or PDFs can also become one PDF together.
     public static func outputs(for files: [URL]) -> [Output] {
@@ -81,6 +82,13 @@ public enum Formats {
             return [
                 Output(ext: "pdf", caption: "추천 - 인쇄/공유용, 엑셀에서 인쇄하듯이"),
                 Output(ext: "csv", caption: "열려 있던 시트의 값만"),
+            ]
+        }
+        if svgInputs.contains(ext) {
+            return [
+                Output(ext: "png", caption: "추천 - 투명한 곳은 투명하게"),
+                Output(ext: "jpg", caption: "어디서나 열려요"),
+                Output(ext: "pdf", caption: "확대해도 선명하게"),
             ]
         }
         if markdownInputs.contains(ext) {

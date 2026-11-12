@@ -69,6 +69,8 @@ extension ConversionServiceImpl {
                 switch (ext, format) {
                 case _ where Formats.imageInputs.contains(ext):
                     try ImageConverter().convert(source, to: output)
+                case _ where Formats.svgInputs.contains(ext):
+                    try await SVGConverter().convert(source, to: output)
                 case _ where Formats.sheetInputs.contains(ext):
                     let title = ((name as NSString).lastPathComponent as NSString).deletingPathExtension
                     try await SheetConverter().convert(
@@ -199,6 +201,8 @@ extension ConversionServiceImpl {
             "이미지를 읽을 수 없어요"
         case ImageConverter.ConversionError.unsupportedOutput(let ext):
             "\(ext.uppercased())로는 아직 저장할 수 없어요"
+        case SVGConverter.ConversionError.unreadable:
+            "SVG 파일이 아니거나 손상됐어요"
         case SheetConverter.ConversionError.unreadable:
             "표 파일이 아니거나 손상됐어요"
         case SheetConverter.ConversionError.empty:
