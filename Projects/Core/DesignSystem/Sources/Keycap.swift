@@ -3,20 +3,17 @@ import SwiftUI
 /// An output format choice drawn as a keyboard key. 
 public struct Keycap: View {
     let ext: String
-    let caption: String
     let key: Character
     let isSelected: Bool
     let action: () -> Void
 
     public init(
         ext: String,
-        caption: String,
         key: Character,
         isSelected: Bool = false,
         action: @escaping () -> Void
     ) {
         self.ext = ext
-        self.caption = caption
         self.key = key
         self.isSelected = isSelected
         self.action = action
@@ -24,17 +21,12 @@ public struct Keycap: View {
 
     public var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(StickerStyle.label(for: ext))
-                        .font(ConvFont.mono(26, .heavy))
-                        .tracking(-1)
-                    Spacer()
-                    KeyHint(String(key), emphasized: true)
-                }
-                Text(caption)
-                    .font(ConvFont.sans(12, isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color(hex: 0x5A4300) : ConvColor.muted)
+            HStack {
+                Text(StickerStyle.label(for: ext))
+                    .font(ConvFont.mono(26, .heavy))
+                    .tracking(-1)
+                Spacer()
+                KeyHint(String(key), emphasized: true)
             }
             .foregroundStyle(ConvColor.ink)
         }

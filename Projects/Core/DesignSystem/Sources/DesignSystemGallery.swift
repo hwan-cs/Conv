@@ -24,8 +24,15 @@ struct DesignSystemGallery: View {
             }
             section("KEYCAPS") {
                 HStack(spacing: 12) {
-                    Keycap(ext: "jpg", caption: "추천 · 어디서나 열려요", key: "1", isSelected: true) {}
-                    Keycap(ext: "png", caption: "화질 손실 없음", key: "2") {}
+                    Keycap(
+                        ext: "jpg",
+                        key: "1",
+                        isSelected: true
+                    ) {}
+                    Keycap(
+                        ext: "png",
+                        key: "2"
+                    ) {}
                 }
                 .frame(width: 440)
             }

@@ -205,12 +205,12 @@ private struct PickScreen: View {
                         ForEach(Array(primaries.enumerated()), id: \.element.id) { index, output in
                             Keycap(
                                 ext: output.ext,
-                                caption: output.caption,
                                 key: Character(String(index + 1)),
                                 isSelected: selected == output
                             ) {
                                 selected = output
                             }
+                            .help(output.caption)
                         }
                     }
                     if !others.isEmpty {
@@ -272,16 +272,11 @@ private struct ConfirmBar: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(question)
-                    .font(ConvFont.sans(14, .semibold))
-                    .foregroundStyle(ConvColor.ink)
-                Text(detail)
-                    .font(ConvFont.sans(12))
-                    .foregroundStyle(ConvColor.muted)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
+            Text(question)
+                .font(ConvFont.sans(14, .semibold))
+                .foregroundStyle(ConvColor.ink)
+                .lineLimit(1)
+                .truncationMode(.middle)
             Spacer()
             Button(action: cancel) {
                 Text(selected == nil ? "취소" : "다시 고르기")
@@ -326,25 +321,6 @@ private struct ConfirmBar: View {
             return "바꿀 형식을 고르세요"
         }
         return "\(subject) → \(StickerStyle.label(for: selected.ext)), 이대로 바꿀까요?"
-    }
-    
-    private var detail: String {
-        guard let selected else {
-            return "숫자 키나 클릭으로 고른 뒤, 한 번 더 확인해요."
-        }
-        if selected.combines {
-            let name = SiblingWriter.combinedName(of: model.items.map(\.url), extension: selected.ext).lastPathComponent
-            return "원본은 그대로 두고, 첫 파일 옆에 저장돼요: \(name)"
-        }
-        if model.items.allSatisfy({ Formats.splitsPages($0.url) }) {
-            let folder = model.items.count == 1 ? "'\(model.items[0].url.deletingPathExtension().lastPathComponent)' 폴더" : "PDF마다 폴더"
-            return "쪽마다 한 장씩, 여러 쪽이면 옆의 \(folder)에 담아요."
-        }
-        if model.items.count == 1, let first = model.items.first {
-            let name = first.url.deletingPathExtension().appendingPathExtension(selected.ext).lastPathComponent
-            return "원본은 그대로 두고, 옆에 저장돼요: \(name)"
-        }
-        return "원본은 그대로 두고, 각 파일 옆에 저장돼요."
     }
 }
 
