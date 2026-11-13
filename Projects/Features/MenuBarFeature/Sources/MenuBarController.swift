@@ -13,7 +13,7 @@ public final class MenuBarController: NSObject {
         guard let button = item.button else {
             return
         }
-        button.image = NSImage(systemSymbolName: "arrow.down.to.line", accessibilityDescription: "Conv")
+        button.image = Self.glyph
         button.target = self
         button.action = #selector(togglePopover)
 
@@ -42,10 +42,62 @@ public final class MenuBarController: NSObject {
             button.image = Self.ring(progress)
             button.toolTip = "바꾸는 중 \(Int(progress * 100))%"
         } else {
-            button.image = NSImage(systemSymbolName: "arrow.down.to.line", accessibilityDescription: "Conv")
+            button.image = Self.glyph
             button.toolTip = nil
         }
     }
+
+    /// The app icon in outline: a file behind, and the one it becomes in front with an arrow.
+    private static let glyph: NSImage = {
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+            let front = NSRect(x: 5, y: 2.5, width: 12, height: 9)
+            NSColor.black.set()
+
+            // The back file's outline stops short of the front one, leaving a gap.
+            NSGraphicsContext.saveGraphicsState()
+            let clip = NSBezierPath(rect: rect)
+            clip.append(
+                NSBezierPath(
+                    roundedRect: front.insetBy(dx: -1.5, dy: -1.5),
+                    xRadius: 3.5,
+                    yRadius: 3.5
+                )
+            )
+            clip.windingRule = .evenOdd
+            clip.addClip()
+            let back = NSBezierPath(
+                roundedRect: NSRect(x: 1.5, y: 7.5, width: 10.5, height: 8),
+                xRadius: 2.2,
+                yRadius: 2.2
+            )
+            back.lineWidth = 1.5
+            back.stroke()
+            NSGraphicsContext.restoreGraphicsState()
+
+            NSBezierPath(
+                roundedRect: front,
+                xRadius: 2.5,
+                yRadius: 2.5
+            ).fill()
+
+            // The arrow is cut out of the front file.
+            NSGraphicsContext.current?.compositingOperation = .clear
+            let arrow = NSBezierPath()
+            arrow.move(to: NSPoint(x: front.minX + 3, y: front.midY))
+            arrow.line(to: NSPoint(x: front.maxX - 3, y: front.midY))
+            arrow.move(to: NSPoint(x: front.maxX - 5.6, y: front.midY + 2.6))
+            arrow.line(to: NSPoint(x: front.maxX - 3, y: front.midY))
+            arrow.line(to: NSPoint(x: front.maxX - 5.6, y: front.midY - 2.6))
+            arrow.lineWidth = 1.6
+            arrow.lineCapStyle = .round
+            arrow.lineJoinStyle = .round
+            arrow.stroke()
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "Conv"
+        return image
+    }()
 
     private static func ring(_ progress: Double) -> NSImage {
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
