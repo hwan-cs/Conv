@@ -64,7 +64,7 @@ final class FinderSync: FIFinderSync {
                 FinderRequest.notification, object: message, userInfo: nil, deliverImmediately: true
             )
         }
-        if !NSRunningApplication.runningApplications(withBundleIdentifier: "com.conv.Conv").isEmpty {
+        if !NSRunningApplication.runningApplications(withBundleIdentifier: "com.hwancs.Conv").isEmpty {
             post()
             return
         }

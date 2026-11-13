@@ -2,7 +2,7 @@ import Foundation
 
 /// What Finder's menu asks the app: convert these files, with this format picked if any.
 public struct FinderRequest: Codable, Sendable, Equatable {
-    public static let notification = Notification.Name("com.conv.Conv.finderRequest")
+    public static let notification = Notification.Name("com.hwancs.Conv.finderRequest")
     /// Passed when the extension launches the app just to convert, so no window opens.
     public static let quietLaunchArgument = "--finder-quiet-launch"
 

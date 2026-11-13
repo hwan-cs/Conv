@@ -44,7 +44,7 @@ import Foundation
 }
 
 public enum ConversionService {
-    public static let serviceName = "com.conv.Conv.ConversionXPC"
+    public static let serviceName = "com.hwancs.Conv.ConversionXPC"
 
     /// Files sent to `combine` in one message.
     public static let combineLimit = 64

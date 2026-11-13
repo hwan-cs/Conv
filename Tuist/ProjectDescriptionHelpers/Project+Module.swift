@@ -1,7 +1,7 @@
 import ProjectDescription
 
 public enum Conv {
-    public static let bundleIDPrefix = "com.conv"
+    public static let bundleIDPrefix = "com.hwancs"
     public static let deploymentTargets: DeploymentTargets = .macOS("14.0")
 
     /// Distributed directly (Developer ID, notarized), not through the App Store.
