@@ -54,7 +54,7 @@ final class FinderSync: FIFinderSync {
     }
 
     /// Every output any input can have, for numbering menu items.
-    private static let formats = ["jpg", "png", "pdf", "heic", "tiff", "gif", "bmp", "avif", "mp4", "mov", "m4a", "mp3", "wav", "aiff", "html", "docx"]
+    private static let formats = ["jpg", "png", "pdf", "heic", "tiff", "gif", "bmp", "avif", "mp4", "mov", "m4a", "mp3", "wav", "aiff", "html", "docx", "xlsx", "csv"]
 
 
     private static func send(_ files: [URL], format: String?) {
