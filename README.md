@@ -13,17 +13,16 @@
   <img src="docs/images/pick.png" width="720" alt="Picking a format for an Excel file">
 </p>
 
-Conv speaks English and Korean, following your Mac's language.
 
 ## Features
 
 - **Drop, pick, done.** Drag files onto the window, press a number key to pick a format, then Return. The converted file is saved next to the original, which is left untouched.
-- **Korean documents, faithfully.** HWP and HWPX become PDF or Word (DOCX), keeping tables, pictures, headers and footers, footnotes and equations.
-- **Excel, printed the way Excel prints.** XLSX to PDF honors print areas, repeated title rows, page breaks and fit-to-page, and redraws charts, pictures and shapes.
+- **Korean documents.** HWP and HWPX become PDF or Word (DOCX), keeping tables, pictures, headers and footers, footnotes and equations.
+- **Excel conversion.** XLSX to PDF honors print areas, repeated title rows, page breaks and fit-to-page, and redraws charts, pictures and shapes.
 - **Many files at once.** Drop a batch and convert it in one go, or combine several images and PDFs into one PDF.
 - **Right from Finder.** Right-click a file and convert it without opening the window.
 - **Paste from the menu bar.** Copy an image, or a file in Finder, and press ⌘V in the menu bar popover.
-- **Nothing leaves your Mac.** Every conversion runs locally, in a sandboxed process separate from the app. Files are never uploaded.
+- **Nothing leaves your Mac.** Every conversion runs locally, in a sandboxed process separate from the app. Files are never uploaded anywhere.
 
 ## Screenshots
 
@@ -50,7 +49,7 @@ Conv speaks English and Korean, following your Mac's language.
 | HWP, HWPX | PDF, DOCX |
 | DOCX | PDF |
 | XLSX | PDF, CSV |
-| CSV | XLSX (encoding detected, including CP949, so Korean opens unbroken in Excel) |
+| CSV | XLSX |
 | PDF | JPG or PNG, one per page |
 | Markdown | PDF, HTML |
 | SVG | PNG, JPG, PDF |
@@ -89,17 +88,15 @@ The app is split into Tuist modules:
 
 ```
 Projects/
-├── App/            The app, the conversion XPC service and the Finder extension
-├── Features/       DropFeature (main window), MenuBarFeature, SettingsFeature
-├── Core/           ConversionKit (formats and jobs), DesignSystem, Platform
-└── Engines/        Converters
-    ├── DocumentEngine  HWP, DOCX, Markdown, XLSX, CSV → PDF, DOCX, HTML, XLSX, CSV
-    ├── PDFEngine       PDF → images, combining PDFs
-    ├── ImageEngine     Images and SVG
-    └── MediaEngine     Video and audio, GIF, MP3 (LAME)
+├── App/    
+├── Features/ 
+├── Core/     
+└── Engines/      
+    ├── DocumentEngine
+    ├── PDFEngine     
+    ├── ImageEngine  
+    └── MediaEngine  
 ```
-
-Conversions run in a sandboxed XPC service, so a malformed file can crash a converter without taking the app down.
 
 ## License
 
