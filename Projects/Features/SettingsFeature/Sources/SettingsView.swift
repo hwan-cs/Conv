@@ -96,9 +96,9 @@ private struct FinderMenuSection: View {
         Section {
             LabeledContent("Finder 확장") {
                 HStack(spacing: 8) {
-                    Text(isEnabled ? "켜짐" : "꺼짐")
+                    Text(isEnabled ? String(localized: "켜짐") : String(localized: "꺼짐"))
                         .foregroundStyle(isEnabled ? .primary : .secondary)
-                    Button(isEnabled ? "관리…" : "켜기…") {
+                    Button(isEnabled ? String(localized: "관리…") : String(localized: "켜기…")) {
                         FIFinderSyncController.showExtensionManagementInterface()
                     }
                 }
@@ -115,7 +115,7 @@ private struct FinderMenuSection: View {
                 }
             }
             HStack {
-                Text(access.folders.isEmpty ? "허용한 폴더가 없어요" : "다른 폴더도 허용할 수 있어요")
+                Text(access.folders.isEmpty ? String(localized: "허용한 폴더가 없어요") : String(localized: "다른 폴더도 허용할 수 있어요"))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("폴더 허용...") {

@@ -58,10 +58,10 @@ extension SiblingWriter {
     /// "IMG_0001 외 4개.pdf", beside the first file.
     public static func combinedName(of files: [URL], extension ext: String) -> URL {
         guard let first = files.first else {
-            return URL(filePath: "합친 파일").appendingPathExtension(ext)
+            return URL(filePath: String(localized: "합친 파일")).appendingPathExtension(ext)
         }
         let base = first.deletingPathExtension().lastPathComponent
-        let name = files.count > 1 ? "\(base) 외 \(files.count - 1)개" : base
+        let name = files.count > 1 ? String(localized: "\(base) 외 \(files.count - 1)개") : base
         return first.deletingLastPathComponent().appending(path: name).appendingPathExtension(ext)
     }
 

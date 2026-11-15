@@ -111,8 +111,8 @@ public final class DropModel {
         if outputs.isEmpty {
             let kinds = Set(items.map { "." + $0.ext.uppercased() }).sorted().joined(separator: ", ")
             notice = items.count > 1 && items.allSatisfy({ !Formats.outputs(for: [$0.url]).isEmpty })
-                ? "\(kinds) 파일은 함께 바꿀 수 없어요. 같은 종류끼리 넣어 주세요."
-                : "\(kinds) 파일은 아직 바꿀 수 없어요. 지금은 문서(PDF, DOCX, HWP, HWPX), 이미지(HEIC, JPG, PNG 등), 영상(MOV, MP4), 소리(MP3, M4A, WAV 등)를 바꿀 수 있어요."
+                ? String(localized: "\(kinds) 파일은 함께 바꿀 수 없어요. 같은 종류끼리 넣어 주세요.")
+                : String(localized: "\(kinds) 파일은 아직 바꿀 수 없어요. 지금은 문서(PDF, DOCX, HWP, HWPX), 이미지(HEIC, JPG, PNG 등), 영상(MOV, MP4), 소리(MP3, M4A, WAV 등)를 바꿀 수 있어요.")
             items = []
             phase = .empty
             return
@@ -146,7 +146,7 @@ public final class DropModel {
         }
         reset()
         let folder = files.first?.deletingLastPathComponent().path(percentEncoded: false) ?? ""
-        notice = "Finder에서 바로 바꾸려면 설정에서 이 폴더(또는 그 위 폴더)를 허용해 주세요: \(folder)"
+        notice = String(localized: "Finder에서 바로 바꾸려면 설정에서 이 폴더(또는 그 위 폴더)를 허용해 주세요: \(folder)")
         noticeNeedsFolderAccess = true
     }
 
@@ -202,7 +202,7 @@ public final class DropModel {
                 askWhereToSave(
                     name: SiblingWriter.combinedName(of: urls, extension: output.ext).lastPathComponent,
                     in: urls[0].deletingLastPathComponent(), ext: output.ext,
-                    message: "합친 PDF를 어디에 저장할까요?"
+                    message: String(localized: "합친 PDF를 어디에 저장할까요?")
                 )
             } then: { chosen in
                 try SiblingWriter.copy(combined, to: chosen)
@@ -211,7 +211,7 @@ public final class DropModel {
         } catch let error as ConversionClient.Failure {
             status = .failed(error.description)
         } catch {
-            status = .failed("파일을 읽을 수 없어요")
+            status = .failed(String(localized: "파일을 읽을 수 없어요"))
         }
         for index in items.indices {
             items[index].status = status
@@ -240,7 +240,7 @@ public final class DropModel {
         } catch let error as ConversionClient.Failure {
             return .failed(error.description)
         } catch {
-            return .failed("파일을 읽을 수 없어요")
+            return .failed(String(localized: "파일을 읽을 수 없어요"))
         }
         let base = item.url.deletingPathExtension().lastPathComponent
         return save {
@@ -250,7 +250,7 @@ public final class DropModel {
                 ? askWhereToSave(item, output: output)
                 : askWhereToSave(
                     name: base, in: item.url.deletingLastPathComponent(), ext: nil,
-                    message: "\(pages.count)쪽을 한 장씩 담을 폴더예요. 어디에 만들까요?"
+                    message: String(localized: "\(pages.count)쪽을 한 장씩 담을 폴더예요. 어디에 만들까요?")
                 )
         } then: { chosen in
             pages.count == 1
@@ -265,12 +265,12 @@ public final class DropModel {
             return .done(try beside())
         } catch {
             guard let chosen = ask() else {
-                return .failed("저장하지 않았어요")
+                return .failed(String(localized: "저장하지 않았어요"))
             }
             do {
                 return .done(try write(chosen))
             } catch {
-                return .failed("저장하지 못했어요")
+                return .failed(String(localized: "저장하지 못했어요"))
             }
         }
     }
@@ -296,7 +296,7 @@ public final class DropModel {
         } catch let error as ConversionClient.Failure {
             return .failed(error.description)
         } catch {
-            return .failed("파일을 읽을 수 없어요")
+            return .failed(String(localized: "파일을 읽을 수 없어요"))
         }
         defer {
             try? converted.close()
@@ -308,13 +308,13 @@ public final class DropModel {
             return .done(try SiblingWriter.copy(converted, nextTo: item.url, extension: output.ext))
         } catch {
             guard let chosen = askWhereToSave(item, output: output) else {
-                return .failed("저장하지 않았어요")
+                return .failed(String(localized: "저장하지 않았어요"))
             }
             do {
                 try SiblingWriter.copy(converted, to: chosen)
                 return .done(chosen)
             } catch {
-                return .failed("저장하지 못했어요")
+                return .failed(String(localized: "저장하지 못했어요"))
             }
         }
     }
@@ -324,10 +324,10 @@ public final class DropModel {
         panel.nameFieldStringValue = SiblingWriter.sibling(of: item.url, extension: output.ext).lastPathComponent
         if item.isPasted {
             panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-            panel.message = "클립보드에서 가져온 이미지예요. 어디에 저장할까요?"
+            panel.message = String(localized: "클립보드에서 가져온 이미지예요. 어디에 저장할까요?")
         } else {
             panel.directoryURL = item.url.deletingLastPathComponent()
-            panel.message = "같은 이름의 파일이 있어요. 어디에 저장할까요?"
+            panel.message = String(localized: "같은 이름의 파일이 있어요. 어디에 저장할까요?")
         }
         if let type = UTType(filenameExtension: output.ext) { panel.allowedContentTypes = [type] }
         return panel.runModal() == .OK ? panel.url : nil

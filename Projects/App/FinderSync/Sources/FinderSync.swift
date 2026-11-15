@@ -18,10 +18,10 @@ final class FinderSync: FIFinderSync {
 
         let outputs = Formats.outputs(for: files)
         guard !outputs.isEmpty else { return menu }
-        let submenu = NSMenu(title: "conv로 바꾸기")
+        let submenu = NSMenu(title: String(localized: "conv로 바꾸기"))
         for (index, output) in outputs.enumerated() {
-            let name = output.combines ? "\(output.ext.uppercased()) 하나로 합치기" : ".\(output.ext.uppercased())"
-            let title = name + (index == 0 ? "  (추천)" : "")
+            let name = output.combines ? String(localized: "\(output.ext.uppercased()) 하나로 합치기") : ".\(output.ext.uppercased())"
+            let title = name + (index == 0 ? "  " + String(localized: "(추천)") : "")
             let item = NSMenuItem(title: title, action: #selector(convert(_:)), keyEquivalent: "")
             item.target = self
             // Finder copies the menu, so the format travels in the tag, not the item itself.
@@ -29,11 +29,11 @@ final class FinderSync: FIFinderSync {
             submenu.addItem(item)
         }
         // No separator: Finder draws one from an extension as an empty row.
-        let more = NSMenuItem(title: "conv에서 더 보기…", action: #selector(openInConv(_:)), keyEquivalent: "")
+        let more = NSMenuItem(title: String(localized: "conv에서 더 보기…"), action: #selector(openInConv(_:)), keyEquivalent: "")
         more.target = self
         submenu.addItem(more)
 
-        let root = NSMenuItem(title: "conv로 바꾸기", action: nil, keyEquivalent: "")
+        let root = NSMenuItem(title: String(localized: "conv로 바꾸기"), action: nil, keyEquivalent: "")
         root.submenu = submenu
         menu.addItem(root)
         return menu

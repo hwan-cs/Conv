@@ -90,12 +90,12 @@ extension ConversionServiceImpl {
                 case ("hwp", "docx"), ("hwpx", "docx"):
                     try HwpDocxConverter().convert(source, to: output)
                 default:
-                    return reply(nil, "\(ext.uppercased()) → \(format.uppercased()) 변환은 아직 못 해요")
+                    return reply(nil, String(localized: "\(ext.uppercased()) → \(format.uppercased()) 변환은 아직 못 해요"))
                 }
                 progress(1)
                 reply(try FileHandle(forReadingFrom: output), nil)
             } catch PagedPDFRenderer.RenderError.timedOut {
-                reply(nil, "시간이 너무 오래 걸려서 멈췄어요")
+                reply(nil, String(localized: "시간이 너무 오래 걸려서 멈췄어요"))
                 // The print operation can't be cancelled; exiting stops it. launchd relaunches us on the next call.
                 exit(1)
             } catch {
@@ -117,7 +117,7 @@ extension ConversionServiceImpl {
             defer { try? FileManager.default.removeItem(at: work) }
             do {
                 guard format == "pdf", inputs.count == names.count else {
-                    return reply(nil, "\(format.uppercased())로는 합칠 수 없어요")
+                    return reply(nil, String(localized: "\(format.uppercased())로는 합칠 수 없어요"))
                 }
                 try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
                 var pdfs: [URL] = []
@@ -135,7 +135,7 @@ extension ConversionServiceImpl {
                         try ImageConverter().convert(source, to: pdf)
                         pdfs.append(pdf)
                     default:
-                        return reply(nil, "\(ext.uppercased()) 파일은 PDF에 합칠 수 없어요")
+                        return reply(nil, String(localized: "\(ext.uppercased()) 파일은 PDF에 합칠 수 없어요"))
                     }
                     progress(Double(index + 1) / Double(names.count) * 0.5)
                 }
@@ -186,37 +186,37 @@ extension ConversionServiceImpl {
     private static func message(for error: Error) -> String {
         switch error {
         case HwpPDFConverter.ConversionError.passwordProtected:
-            "암호가 걸린 HWP는 바꿀 수 없어요"
+            String(localized: "암호가 걸린 HWP는 바꿀 수 없어요")
         case HwpPDFConverter.ConversionError.unsupportedVersion(let version):
-            "HWP \(version) 형식은 아직 못 읽어요"
+            String(localized: "HWP \(version) 형식은 아직 못 읽어요")
         case HwpPDFConverter.ConversionError.unreadableDocument:
-            "HWP 파일이 아니거나 손상됐어요"
+            String(localized: "HWP 파일이 아니거나 손상됐어요")
         case PDFEngine.ConversionError.passwordProtected:
-            "암호가 걸린 PDF는 바꿀 수 없어요"
+            String(localized: "암호가 걸린 PDF는 바꿀 수 없어요")
         case PDFEngine.ConversionError.unreadable:
-            "PDF 파일이 아니거나 손상됐어요"
+            String(localized: "PDF 파일이 아니거나 손상됐어요")
         case PDFEngine.ConversionError.unsupportedOutput(let ext):
-            "PDF를 \(ext.uppercased())로는 아직 못 바꿔요"
+            String(localized: "PDF를 \(ext.uppercased())로는 아직 못 바꿔요")
         case ImageConverter.ConversionError.unreadable:
-            "이미지를 읽을 수 없어요"
+            String(localized: "이미지를 읽을 수 없어요")
         case ImageConverter.ConversionError.unsupportedOutput(let ext):
-            "\(ext.uppercased())로는 아직 저장할 수 없어요"
+            String(localized: "\(ext.uppercased())로는 아직 저장할 수 없어요")
         case SVGConverter.ConversionError.unreadable:
-            "SVG 파일이 아니거나 손상됐어요"
+            String(localized: "SVG 파일이 아니거나 손상됐어요")
         case SheetConverter.ConversionError.unreadable:
-            "표 파일이 아니거나 손상됐어요"
+            String(localized: "표 파일이 아니거나 손상됐어요")
         case SheetConverter.ConversionError.empty:
-            "시트가 비어 있어서 바꿀 게 없어요"
+            String(localized: "시트가 비어 있어서 바꿀 게 없어요")
         case SheetConverter.ConversionError.tooLarge:
-            "엑셀 한 시트에 담기에는 너무 커요"
+            String(localized: "엑셀 한 시트에 담기에는 너무 커요")
         case MediaConverter.ConversionError.unreadable:
-            "영상이나 소리를 읽을 수 없어요"
+            String(localized: "영상이나 소리를 읽을 수 없어요")
         case MediaConverter.ConversionError.noAudio:
-            "소리가 없는 파일이에요"
+            String(localized: "소리가 없는 파일이에요")
         case MediaConverter.ConversionError.exportFailed(let reason):
-            "변환하지 못했어요 (\(reason))"
+            String(localized: "변환하지 못했어요 (\(reason))")
         default:
-            "변환하지 못했어요 (\(error))"
+            String(localized: "변환하지 못했어요 (\(String(describing: error)))")
         }
     }
 }

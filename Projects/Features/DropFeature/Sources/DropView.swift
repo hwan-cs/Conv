@@ -279,7 +279,7 @@ private struct ConfirmBar: View {
                 .truncationMode(.middle)
             Spacer()
             Button(action: cancel) {
-                Text(selected == nil ? "취소" : "다시 고르기")
+                Text(selected == nil ? String(localized: "취소") : String(localized: "다시 고르기"))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(RoundedRectangle(cornerRadius: 10).fill(ConvColor.white))
@@ -313,14 +313,14 @@ private struct ConfirmBar: View {
         guard let first = model.items.first else {
             return ""
         }
-        return model.items.count == 1 ? first.name : "\(model.items.count)개 파일"
+        return model.items.count == 1 ? first.name : String(localized: "\(model.items.count)개 파일")
     }
     
     private var question: String {
         guard let selected else {
-            return "바꿀 형식을 고르세요"
+            return String(localized: "바꿀 형식을 고르세요")
         }
-        return "\(subject) → \(StickerStyle.label(for: selected.ext)), 이대로 바꿀까요?"
+        return String(localized: "\(subject) → \(StickerStyle.label(for: selected.ext)), 이대로 바꿀까요?")
     }
 }
 
@@ -331,7 +331,7 @@ private struct FileCard: View {
         guard let first = items.first else {
             return ""
         }
-        return items.count == 1 ? first.name : "\(first.name) 외 \(items.count - 1)개"
+        return items.count == 1 ? first.name : String(localized: "\(first.name) 외 \(items.count - 1)개")
     }
     
     var body: some View {
@@ -479,12 +479,22 @@ private struct DoneScreen: View {
     
     private var headline: String {
         guard model.finishedCount > 0 else {
-            return "바꾸지 못했어요"
+            return String(localized: "바꾸지 못했어요")
         }
         if model.output?.combines == true {
-            return "\(model.items.count)개를 PDF 하나로 합쳤어요"
+            return String(localized: "\(model.items.count)개를 PDF 하나로 합쳤어요")
         }
-        return "\(model.finishedCount)개 바꿨어요"
+        return String(localized: "\(model.finishedCount)개 바꿨어요")
+    }
+    
+    private var savedWhere: String {
+        if model.items.contains(where: \.isPasted) {
+            return String(localized: "고른 곳에 저장했어요.")
+        }
+        if model.output?.combines == true {
+            return String(localized: "원본은 그대로 두고, 합친 파일을 저장했어요.")
+        }
+        return String(localized: "원본은 그대로 두고, 바뀐 파일은 원본 옆에 놓았어요.")
     }
     
     var body: some View {
@@ -506,7 +516,7 @@ private struct DoneScreen: View {
                 .foregroundStyle(ConvColor.ink)
             VStack(alignment: .leading, spacing: 4) {
                 if model.finishedCount > 0 {
-                    Text(model.items.contains(where: \.isPasted) ? "고른 곳에 저장했어요." : model.output?.combines == true ? "원본은 그대로 두고, 합친 파일을 저장했어요." : "원본은 그대로 두고, 바뀐 파일은 원본 옆에 놓았어요.")
+                    Text(savedWhere)
                 }
                 if model.output?.combines == true {
                     if case .failed(let message) = model.failedItems.first?.status {

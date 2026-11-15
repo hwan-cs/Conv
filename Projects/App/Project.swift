@@ -7,6 +7,8 @@ let version: [String: Plist.Value] = [
     "CFBundleShortVersionString": "0.1.0",
     "CFBundleVersion": "1",
 ]
+let localizable: ResourceFileElement = "Localization/Localizable.xcstrings"
+
 let sandbox: Entitlements = .dictionary([
     "com.apple.security.app-sandbox": true,
     "com.apple.security.files.user-selected.read-write": true,
@@ -60,7 +62,7 @@ let app = Target.target(
         "CFBundleDocumentTypes": documentTypes,
     ]) { $1 }),
     sources: ["App/Sources/**"],
-    resources: ["App/Resources/**"],
+    resources: ["App/Resources/**", localizable],
     entitlements: sandbox,
     dependencies: [
         .module(.dropFeature),
@@ -94,6 +96,7 @@ let conversionXPC = Target.target(
         "XPCService": ["ServiceType": "Application", "RunLoopType": "NSRunLoop"],
     ]) { $1 }),
     sources: ["XPC/Sources/**"],
+    resources: [localizable],
     entitlements: conversionSandbox,
     dependencies: [
         .module(.conversionKit),
@@ -128,6 +131,7 @@ let finderSync = Target.target(
         "../Core/ConversionKit/Sources/FinderFormatNotification.swift",
     ],
     // Sends paths only; the app reads them through folders the user allowed in Settings.
+    resources: [localizable],
     entitlements: .dictionary(["com.apple.security.app-sandbox": true]),
     dependencies: [.sdk(name: "FinderSync", type: .framework)],
     settings: .settings(base: Conv.baseSettings)
@@ -135,5 +139,6 @@ let finderSync = Target.target(
 
 let project = Project(
     name: "App",
+    options: .options(defaultKnownRegions: ["en", "ko"], developmentRegion: "en"),
     targets: [app, conversionXPC, finderSync]
 )

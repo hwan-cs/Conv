@@ -43,9 +43,9 @@ public enum Formats {
             return common
         }
         if let index = common.firstIndex(where: { $0.ext == "pdf" }) {
-            common[index] = Output(ext: "pdf", caption: "여러 장을 PDF 하나로", isPrimary: common[index].isPrimary, combines: true)
+            common[index] = Output(ext: "pdf", caption: String(localized: "여러 장을 PDF 하나로"), isPrimary: common[index].isPrimary, combines: true)
         } else {
-            common.insert(Output(ext: "pdf", caption: "추천 - PDF 하나로 합치기", combines: true), at: 0)
+            common.insert(Output(ext: "pdf", caption: String(localized: "추천 - PDF 하나로 합치기"), combines: true), at: 0)
         }
         return common
     }
@@ -60,41 +60,41 @@ public enum Formats {
         let ext = normalized(input.pathExtension)
         if ext == "hwp" || ext == "hwpx" {
             return [
-                Output(ext: "pdf", caption: "추천 - 인쇄/공유용, 그대로 보여요"),
-                Output(ext: "docx", caption: "Word에서 고쳐 쓰기"),
+                Output(ext: "pdf", caption: String(localized: "추천 - 인쇄/공유용, 그대로 보여요")),
+                Output(ext: "docx", caption: String(localized: "Word에서 고쳐 쓰기")),
             ]
         }
         if documentInputs.contains(ext) {
-            return [Output(ext: "pdf", caption: "인쇄/공유용, 그대로 보여요")]
+            return [Output(ext: "pdf", caption: String(localized: "인쇄/공유용, 그대로 보여요"))]
         }
         if pdfInputs.contains(ext) {
             return [
-                Output(ext: "jpg", caption: "추천 - 쪽마다 한 장씩"),
-                Output(ext: "png", caption: "쪽마다 한 장씩, 글자가 더 또렷하게"),
+                Output(ext: "jpg", caption: String(localized: "추천 - 쪽마다 한 장씩")),
+                Output(ext: "png", caption: String(localized: "쪽마다 한 장씩, 글자가 더 또렷하게")),
             ]
         }
         if ext == "csv" {
             return [
-                Output(ext: "xlsx", caption: "추천 - 엑셀에서 한글이 안 깨져요"),
+                Output(ext: "xlsx", caption: String(localized: "추천 - 엑셀에서 한글이 안 깨져요")),
             ]
         }
         if ext == "xlsx" {
             return [
-                Output(ext: "pdf", caption: "추천 - 인쇄/공유용, 엑셀에서 인쇄하듯이"),
-                Output(ext: "csv", caption: "열려 있던 시트의 값만"),
+                Output(ext: "pdf", caption: String(localized: "추천 - 인쇄/공유용, 엑셀에서 인쇄하듯이")),
+                Output(ext: "csv", caption: String(localized: "열려 있던 시트의 값만")),
             ]
         }
         if svgInputs.contains(ext) {
             return [
-                Output(ext: "png", caption: "추천 - 투명한 곳은 투명하게"),
-                Output(ext: "jpg", caption: "어디서나 열려요"),
-                Output(ext: "pdf", caption: "확대해도 선명하게"),
+                Output(ext: "png", caption: String(localized: "추천 - 투명한 곳은 투명하게")),
+                Output(ext: "jpg", caption: String(localized: "어디서나 열려요")),
+                Output(ext: "pdf", caption: String(localized: "확대해도 선명하게")),
             ]
         }
         if markdownInputs.contains(ext) {
             return [
-                Output(ext: "pdf", caption: "추천 - 인쇄/공유용, 쪽으로 나눠서"),
-                Output(ext: "html", caption: "웹 브라우저로 바로 열기"),
+                Output(ext: "pdf", caption: String(localized: "추천 - 인쇄/공유용, 쪽으로 나눠서")),
+                Output(ext: "html", caption: String(localized: "웹 브라우저로 바로 열기")),
             ]
         }
         if videoInputs.contains(ext) {
@@ -103,7 +103,7 @@ public enum Formats {
                 guard output.ext == "gif" else {
                     return output
                 }
-                return Output(ext: "gif", caption: "움직이는 이미지로, 소리 없이", isPrimary: output.isPrimary)
+                return Output(ext: "gif", caption: String(localized: "움직이는 이미지로, 소리 없이"), isPrimary: output.isPrimary)
             }
         }
         if audioInputs.contains(ext) {
@@ -128,7 +128,7 @@ public enum Formats {
     }
 
     private static func caption(_ ext: String, recommended: Bool) -> String {
-        let base = switch ext {
+        let base: String.LocalizationValue = switch ext {
         case "jpg": "어디서나 열려요"
         case "png": "화질 그대로, 투명도 유지"
         case "pdf": "한 장씩 문서로"
@@ -145,7 +145,8 @@ public enum Formats {
         case "aiff": "무손실, Mac 편집용"
         default: ""
         }
-        return recommended ? "추천 · \(base)" : base
+        let caption = String(localized: base)
+        return recommended ? String(localized: "추천 · \(caption)") : caption
     }
 
     private static func normalized(_ ext: String) -> String {

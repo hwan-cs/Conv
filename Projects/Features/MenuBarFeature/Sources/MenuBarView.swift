@@ -147,15 +147,15 @@ struct MenuBarView: View {
             (NSPasteboard.PasteboardType("public.heic"), "heic"), (.tiff, "tiff"),
         ]
         guard let (data, ext) = types.lazy.compactMap({ type, ext in pasteboard.data(forType: type).map { ($0, ext) } }).first else {
-            notice = "클립보드에 이미지나 파일이 없어요."
+            notice = String(localized: "클립보드에 이미지나 파일이 없어요.")
             return
         }
         let stamp = Date.now.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false).dateTimeSeparator(.space).timeSeparator(.omitted))
-        let url = FileManager.default.temporaryDirectory.appending(path: "클립보드 이미지 \(stamp).\(ext)")
+        let url = FileManager.default.temporaryDirectory.appending(path: String(localized: "클립보드 이미지 \(stamp)") + ".\(ext)")
         do {
             try data.write(to: url)
         } catch {
-            notice = "이미지를 가져오지 못했어요."
+            notice = String(localized: "이미지를 가져오지 못했어요.")
             return
         }
         notice = nil
@@ -165,7 +165,7 @@ struct MenuBarView: View {
 
     static func relative(_ date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.locale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "ko")
         formatter.unitsStyle = .short
         formatter.dateTimeStyle = .named
         return formatter.localizedString(for: date, relativeTo: .now)

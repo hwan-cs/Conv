@@ -82,7 +82,7 @@ public final class ConversionClient: @unchecked Sendable {
             for handle in next { try? handle.close() }
             parts = [part] + parts.dropFirst(next.count)
         }
-        guard let combined = parts.first else { throw Failure(description: "합칠 파일이 없어요") }
+        guard let combined = parts.first else { throw Failure(description: String(localized: "합칠 파일이 없어요")) }
         return combined
     }
 
@@ -117,13 +117,13 @@ public final class ConversionClient: @unchecked Sendable {
             let resumed = Once()
             let service = connection.remoteObjectProxyWithErrorHandler { error in
                 if resumed.claim() {
-                    continuation.resume(throwing: Failure(description: "변환 서비스가 멈췄어요: \(error.localizedDescription)"))
+                    continuation.resume(throwing: Failure(description: String(localized: "변환 서비스가 멈췄어요: \(error.localizedDescription)")))
                 }
             } as? ConversionServiceProtocol
             
             guard let service else {
                 if resumed.claim() {
-                    continuation.resume(throwing: Failure(description: "변환 서비스에 연결할 수 없어요"))
+                    continuation.resume(throwing: Failure(description: String(localized: "변환 서비스에 연결할 수 없어요")))
                 }
                 return
             }
@@ -134,7 +134,7 @@ public final class ConversionClient: @unchecked Sendable {
                 if let output {
                     continuation.resume(returning: output)
                 } else {
-                    continuation.resume(throwing: Failure(description: error ?? "알 수 없는 오류"))
+                    continuation.resume(throwing: Failure(description: error ?? String(localized: "알 수 없는 오류")))
                 }
             }
         }

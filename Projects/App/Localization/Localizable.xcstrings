@@ -1,0 +1,2309 @@
+{
+  "sourceLanguage" : "ko",
+  "strings" : {
+    "" : {
+      "shouldTranslate" : false
+    },
+    "%@ → %@ 변환은 아직 못 해요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't convert %@ to %@ yet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ → %@ 변환은 아직 못 해요"
+          }
+        }
+      }
+    },
+    "%@ → %@, 이대로 바꿀까요?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Convert %@ to %@?"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ → %@, 이대로 바꿀까요?"
+          }
+        }
+      }
+    },
+    "%@ 외 %lld개" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ and %lld more"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 외 %lld개"
+          }
+        }
+      }
+    },
+    "%@ 파일" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ file"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 파일"
+          }
+        }
+      }
+    },
+    "%@ 파일은 PDF에 합칠 수 없어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ files can't be combined into a PDF"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 파일은 PDF에 합칠 수 없어요"
+          }
+        }
+      }
+    },
+    "%@ 파일은 아직 바꿀 수 없어요. 지금은 문서(PDF, DOCX, HWP, HWPX), 이미지(HEIC, JPG, PNG 등), 영상(MOV, MP4), 소리(MP3, M4A, WAV 등)를 바꿀 수 있어요." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conv can't convert %@ files yet. It converts documents (PDF, DOCX, HWP, HWPX), images (HEIC, JPG, PNG and more), video (MOV, MP4) and audio (MP3, M4A, WAV and more)."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 파일은 아직 바꿀 수 없어요. 지금은 문서(PDF, DOCX, HWP, HWPX), 이미지(HEIC, JPG, PNG 등), 영상(MOV, MP4), 소리(MP3, M4A, WAV 등)를 바꿀 수 있어요."
+          }
+        }
+      }
+    },
+    "%@ 파일은 함께 바꿀 수 없어요. 같은 종류끼리 넣어 주세요." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ files can't be converted together. Drop files of one kind at a time."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 파일은 함께 바꿀 수 없어요. 같은 종류끼리 넣어 주세요."
+          }
+        }
+      }
+    },
+    "%@ 하나로 합치기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combine into one %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 하나로 합치기"
+          }
+        }
+      }
+    },
+    "%@: %@" : {
+      "shouldTranslate" : false
+    },
+    "%@로 바꿨어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Converted to %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@로 바꿨어요"
+          }
+        }
+      }
+    },
+    "%@로는 아직 저장할 수 없어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't save as %@ yet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@로는 아직 저장할 수 없어요"
+          }
+        }
+      }
+    },
+    "%@로는 합칠 수 없어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't combine into %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@로는 합칠 수 없어요"
+          }
+        }
+      }
+    },
+    "%lld / %lld" : {
+      "shouldTranslate" : false
+    },
+    "%lld%%" : {
+      "shouldTranslate" : false
+    },
+    "%lld/%lld" : {
+      "shouldTranslate" : false
+    },
+    "%lld개 바꾸는 중" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Converting %lld file"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Converting %lld files"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개 바꾸는 중"
+          }
+        }
+      }
+    },
+    "%lld개 바꿨어요" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Converted %lld file"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Converted %lld files"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개 바꿨어요"
+          }
+        }
+      }
+    },
+    "%lld개 중 %lld개를 %@로 바꿨어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Converted %2$lld of %1$lld files to %3$@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개 중 %lld개를 %@로 바꿨어요"
+          }
+        }
+      }
+    },
+    "%lld개 파일" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld files"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개 파일"
+          }
+        }
+      }
+    },
+    "%lld개를 %@ 하나로 합쳤어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combined %lld files into one %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개를 %@ 하나로 합쳤어요"
+          }
+        }
+      }
+    },
+    "%lld개를 %@로 바꿨어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Converted %lld files to %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개를 %@로 바꿨어요"
+          }
+        }
+      }
+    },
+    "%lld개를 PDF 하나로 합쳤어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combined %lld files into one PDF"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개를 PDF 하나로 합쳤어요"
+          }
+        }
+      }
+    },
+    "%lld쪽을 한 장씩 담을 폴더예요. 어디에 만들까요?" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "A folder for the %lld page as an image. Where do you want to make it?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "A folder for the %lld pages, one image each. Where do you want to make it?"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld쪽을 한 장씩 담을 폴더예요. 어디에 만들까요?"
+          }
+        }
+      }
+    },
+    "(추천)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(Recommended)"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(추천)"
+          }
+        }
+      }
+    },
+    ".heic → .jpg" : {
+      "shouldTranslate" : false
+    },
+    "1. Finder 확장을 켜요. 시스템 설정에서 Conv를 체크하면 돼요.\n2. 바꿀 파일이 있는 폴더를 허용해요. 홈 폴더를 고르면 그 안 어디서든 쓸 수 있어요.\n3. Finder에서 파일을 우클릭하고 \"conv로 바꾸기\"에서 포맷을 골라요." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1. Turn on the Finder extension by checking Conv in System Settings.\n2. Allow the folders your files are in. Allowing your home folder covers everything inside it.\n3. In Finder, right-click a file and pick a format under \"Convert with conv\"."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1. Finder 확장을 켜요. 시스템 설정에서 Conv를 체크하면 돼요.\n2. 바꿀 파일이 있는 폴더를 허용해요. 홈 폴더를 고르면 그 안 어디서든 쓸 수 있어요.\n3. Finder에서 파일을 우클릭하고 \"conv로 바꾸기\"에서 포맷을 골라요."
+          }
+        }
+      }
+    },
+    "3개 바꿨어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Converted 3 files"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3개 바꿨어요"
+          }
+        }
+      }
+    },
+    "Apple 기기/편집용" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For Apple devices and editing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple 기기/편집용"
+          }
+        }
+      }
+    },
+    "BSD 2-Clause 외" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BSD 2-Clause and others"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BSD 2-Clause 외"
+          }
+        }
+      }
+    },
+    "CONV'D" : {
+      "shouldTranslate" : false
+    },
+    "Conv" : {
+      "shouldTranslate" : false
+    },
+    "Conv: 바꾸는 중" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conv: Converting"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conv: 바꾸는 중"
+          }
+        }
+      }
+    },
+    "DOCX, HWPX 파일 읽기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading DOCX and HWPX files"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DOCX, HWPX 파일 읽기"
+          }
+        }
+      }
+    },
+    "Finder 우클릭 메뉴" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder Right-Click Menu"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder 우클릭 메뉴"
+          }
+        }
+      }
+    },
+    "Finder 확장" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder Extension"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder 확장"
+          }
+        }
+      }
+    },
+    "Finder에서 바로 바꾸려면 설정에서 이 폴더(또는 그 위 폴더)를 허용해 주세요: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To convert right from Finder, allow this folder (or one above it) in Settings: %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder에서 바로 바꾸려면 설정에서 이 폴더(또는 그 위 폴더)를 허용해 주세요: %@"
+          }
+        }
+      }
+    },
+    "Finder에서 바로 바꿀 폴더를 고르세요. 그 안의 파일은 다시 묻지 않고 바꿔요." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a folder to convert in right from Finder. Files inside it convert without asking again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder에서 바로 바꿀 폴더를 고르세요. 그 안의 파일은 다시 묻지 않고 바꿔요."
+          }
+        }
+      }
+    },
+    "Finder에서 보기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show in Finder"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder에서 보기"
+          }
+        }
+      }
+    },
+    "HWP %@ 형식은 아직 못 읽어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't read HWP %@ files yet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HWP %@ 형식은 아직 못 읽어요"
+          }
+        }
+      }
+    },
+    "HWP 문서를 바꿀 때 한글 글꼴 대신" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stand-ins for Hangul fonts in HWP documents"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HWP 문서를 바꿀 때 한글 글꼴 대신"
+          }
+        }
+      }
+    },
+    "HWP 파일이 아니거나 손상됐어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not an HWP file, or it's damaged"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HWP 파일이 아니거나 손상됐어요"
+          }
+        }
+      }
+    },
+    "LAME은 동적 라이브러리(libmp3lame.dylib)로 연결되어 있으며, 수정하지 않은 3.100 공식 소스로 빌드했습니다. 앱 안의 Contents/XPCServices/ConversionXPC.xpc/Contents/Frameworks에 있고, 같은 이름의 호환 빌드로 바꿔 넣을 수 있습니다. 소스: https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LAME is linked as a dynamic library (libmp3lame.dylib), built from the unmodified official 3.100 source. It is in Contents/XPCServices/ConversionXPC.xpc/Contents/Frameworks inside the app, and can be replaced with a compatible build of the same name. Source: https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LAME은 동적 라이브러리(libmp3lame.dylib)로 연결되어 있으며, 수정하지 않은 3.100 공식 소스로 빌드했습니다. 앱 안의 Contents/XPCServices/ConversionXPC.xpc/Contents/Frameworks에 있고, 같은 이름의 호환 빌드로 바꿔 넣을 수 있습니다. 소스: https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz"
+          }
+        }
+      }
+    },
+    "MP3로 저장" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving MP3"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MP3로 저장"
+          }
+        }
+      }
+    },
+    "Markdown 문법 해석 (swift-markdown 안에서)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parsing Markdown (inside swift-markdown)"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markdown 문법 해석 (swift-markdown 안에서)"
+          }
+        }
+      }
+    },
+    "Markdown 파일 읽기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading Markdown files"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markdown 파일 읽기"
+          }
+        }
+      }
+    },
+    "PDF 파일이 아니거나 손상됐어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not a PDF file, or it's damaged"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF 파일이 아니거나 손상됐어요"
+          }
+        }
+      }
+    },
+    "PDF를 %@로는 아직 못 바꿔요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't convert PDF to %@ yet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PDF를 %@로는 아직 못 바꿔요"
+          }
+        }
+      }
+    },
+    "SVG 파일이 아니거나 손상됐어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not an SVG file, or it's damaged"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SVG 파일이 아니거나 손상됐어요"
+          }
+        }
+      }
+    },
+    "Word에서 고쳐 쓰기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit it in Word"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Word에서 고쳐 쓰기"
+          }
+        }
+      }
+    },
+    "conv 열기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open conv"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conv 열기"
+          }
+        }
+      }
+    },
+    "conv로 바꾸기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Convert with conv"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conv로 바꾸기"
+          }
+        }
+      }
+    },
+    "conv에서 더 보기…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More in conv…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "conv에서 더 보기…"
+          }
+        }
+      }
+    },
+    "⌘O" : {
+      "shouldTranslate" : false
+    },
+    "가장 작은 용량" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smallest size"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가장 작은 용량"
+          }
+        }
+      }
+    },
+    "같은 이름의 파일이 있어요. 어디에 저장할까요?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A file with the same name already exists. Where do you want to save it?"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "같은 이름의 파일이 있어요. 어디에 저장할까요?"
+          }
+        }
+      }
+    },
+    "고른 곳에 저장했어요." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved where you chose."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고른 곳에 저장했어요."
+          }
+        }
+      }
+    },
+    "관리…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "관리…"
+          }
+        }
+      }
+    },
+    "꺼짐" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "꺼짐"
+          }
+        }
+      }
+    },
+    "나눔고딕, 나눔명조" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nanum Gothic, Nanum Myeongjo"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "나눔고딕, 나눔명조"
+          }
+        }
+      }
+    },
+    "놓으세요!" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Let go!"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "놓으세요!"
+          }
+        }
+      }
+    },
+    "다른 폴더도 허용할 수 있어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You can allow more folders"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 폴더도 허용할 수 있어요"
+          }
+        }
+      }
+    },
+    "다시 고르기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Again"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 고르기"
+          }
+        }
+      }
+    },
+    "닫기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "닫기"
+          }
+        }
+      }
+    },
+    "대기 중" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대기 중"
+          }
+        }
+      }
+    },
+    "더 보기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "더 보기"
+          }
+        }
+      }
+    },
+    "로 직접 고르기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "to choose files"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로 직접 고르기"
+          }
+        }
+      }
+    },
+    "무손실, Mac 편집용" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lossless, for editing on a Mac"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "무손실, Mac 편집용"
+          }
+        }
+      }
+    },
+    "무손실, 편집용" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lossless, for editing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "무손실, 편집용"
+          }
+        }
+      }
+    },
+    "무엇으로 바꿀까요?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Convert to what?"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "무엇으로 바꿀까요?"
+          }
+        }
+      }
+    },
+    "바꾸기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Convert"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "바꾸기"
+          }
+        }
+      }
+    },
+    "바꾸는 중" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Converting"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "바꾸는 중"
+          }
+        }
+      }
+    },
+    "바꾸는 중 %lld%%" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Converting %lld%%"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "바꾸는 중 %lld%%"
+          }
+        }
+      }
+    },
+    "바꾸지 못했어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't convert"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "바꾸지 못했어요"
+          }
+        }
+      }
+    },
+    "바꿀 형식을 고르세요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a format"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "바꿀 형식을 고르세요"
+          }
+        }
+      }
+    },
+    "버전" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "버전"
+          }
+        }
+      }
+    },
+    "변환 서비스가 멈췄어요: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The conversion service stopped: %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "변환 서비스가 멈췄어요: %@"
+          }
+        }
+      }
+    },
+    "변환 서비스에 연결할 수 없어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't connect to the conversion service"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "변환 서비스에 연결할 수 없어요"
+          }
+        }
+      }
+    },
+    "변환하지 못했어요 (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't convert (%@)"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "변환하지 못했어요 (%@)"
+          }
+        }
+      }
+    },
+    "복사한 이미지나 Finder에서 복사한 파일" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A copied image, or files copied in Finder"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "복사한 이미지나 Finder에서 복사한 파일"
+          }
+        }
+      }
+    },
+    "붙여넣기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "붙여넣기"
+          }
+        }
+      }
+    },
+    "붙여넣어 바꾸기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste to convert"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "붙여넣어 바꾸기"
+          }
+        }
+      }
+    },
+    "빼기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빼기"
+          }
+        }
+      }
+    },
+    "설정" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정"
+          }
+        }
+      }
+    },
+    "설정 (⌘,)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings (⌘,)"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정 (⌘,)"
+          }
+        }
+      }
+    },
+    "설정 열기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정 열기"
+          }
+        }
+      }
+    },
+    "소리가 없는 파일이에요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The file has no audio"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소리가 없는 파일이에요"
+          }
+        }
+      }
+    },
+    "소리만, 어디서나 재생돼요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio only, plays anywhere"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소리만, 어디서나 재생돼요"
+          }
+        }
+      }
+    },
+    "소리만, 작은 용량 (AAC)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio only, small (AAC)"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소리만, 작은 용량 (AAC)"
+          }
+        }
+      }
+    },
+    "시간이 너무 오래 걸려서 멈췄어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stopped because it took too long"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시간이 너무 오래 걸려서 멈췄어요"
+          }
+        }
+      }
+    },
+    "시트가 비어 있어서 바꿀 게 없어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The sheet is empty, so there's nothing to convert"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시트가 비어 있어서 바꿀 게 없어요"
+          }
+        }
+      }
+    },
+    "알 수 없는 오류" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown error"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알 수 없는 오류"
+          }
+        }
+      }
+    },
+    "암호가 걸린 HWP는 바꿀 수 없어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't convert a password-protected HWP"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "암호가 걸린 HWP는 바꿀 수 없어요"
+          }
+        }
+      }
+    },
+    "암호가 걸린 PDF는 바꿀 수 없어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Can't convert a password-protected PDF"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "암호가 걸린 PDF는 바꿀 수 없어요"
+          }
+        }
+      }
+    },
+    "어디서나 열려요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens anywhere"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "어디서나 열려요"
+          }
+        }
+      }
+    },
+    "어디서나 재생돼요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plays anywhere"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "어디서나 재생돼요"
+          }
+        }
+      }
+    },
+    "엑셀 한 시트에 담기에는 너무 커요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Too large for one Excel sheet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "엑셀 한 시트에 담기에는 너무 커요"
+          }
+        }
+      }
+    },
+    "여기로 던지세요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drop files here"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여기로 던지세요"
+          }
+        }
+      }
+    },
+    "여러 장을 PDF 하나로" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All of them in one PDF"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여러 장을 PDF 하나로"
+          }
+        }
+      }
+    },
+    "열려 있던 시트의 값만" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Values of the open sheet only"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열려 있던 시트의 값만"
+          }
+        }
+      }
+    },
+    "영상이나 소리를 읽을 수 없어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the video or audio"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "영상이나 소리를 읽을 수 없어요"
+          }
+        }
+      }
+    },
+    "오래된 프로그램용" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For older apps"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오래된 프로그램용"
+          }
+        }
+      }
+    },
+    "오픈소스 라이선스" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Source Licenses"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오픈소스 라이선스"
+          }
+        }
+      }
+    },
+    "움직이는 이미지 유지" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keeps the animation"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "움직이는 이미지 유지"
+          }
+        }
+      }
+    },
+    "움직이는 이미지로, 소리 없이" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As an animated image, without sound"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "움직이는 이미지로, 소리 없이"
+          }
+        }
+      }
+    },
+    "원본은 그대로 두고, 바뀐 파일은 원본 옆에 놓았어요." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The originals are untouched. The converted files are saved next to them."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원본은 그대로 두고, 바뀐 파일은 원본 옆에 놓았어요."
+          }
+        }
+      }
+    },
+    "원본은 그대로 두고, 바뀐 파일은 원본 옆에." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Originals untouched, converted files beside them."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원본은 그대로 두고, 바뀐 파일은 원본 옆에."
+          }
+        }
+      }
+    },
+    "원본은 그대로 두고, 합친 파일을 저장했어요." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The originals are untouched. The combined file is saved next to them."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원본은 그대로 두고, 합친 파일을 저장했어요."
+          }
+        }
+      }
+    },
+    "웹 브라우저로 바로 열기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens right in a web browser"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "웹 브라우저로 바로 열기"
+          }
+        }
+      }
+    },
+    "웹사이트" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Website"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "웹사이트"
+          }
+        }
+      }
+    },
+    "이미지를 가져오지 못했어요." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't get the image."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지를 가져오지 못했어요."
+          }
+        }
+      }
+    },
+    "이미지를 읽을 수 없어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the image"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지를 읽을 수 없어요"
+          }
+        }
+      }
+    },
+    "인쇄/공유용, 그대로 보여요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For printing and sharing, looks the same"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "인쇄/공유용, 그대로 보여요"
+          }
+        }
+      }
+    },
+    "인쇄/편집용" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For printing and editing"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "인쇄/편집용"
+          }
+        }
+      }
+    },
+    "저장하지 못했어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't save"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장하지 못했어요"
+          }
+        }
+      }
+    },
+    "저장하지 않았어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not saved"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장하지 않았어요"
+          }
+        }
+      }
+    },
+    "쪽마다 한 장씩, 글자가 더 또렷하게" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One image per page, sharper text"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "쪽마다 한 장씩, 글자가 더 또렷하게"
+          }
+        }
+      }
+    },
+    "최근" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근"
+          }
+        }
+      }
+    },
+    "추천 - PDF 하나로 합치기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended - Combine into one PDF"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추천 - PDF 하나로 합치기"
+          }
+        }
+      }
+    },
+    "추천 - 엑셀에서 한글이 안 깨져요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended - Korean text opens unbroken in Excel"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추천 - 엑셀에서 한글이 안 깨져요"
+          }
+        }
+      }
+    },
+    "추천 - 인쇄/공유용, 그대로 보여요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended - For printing and sharing, looks the same"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추천 - 인쇄/공유용, 그대로 보여요"
+          }
+        }
+      }
+    },
+    "추천 - 인쇄/공유용, 엑셀에서 인쇄하듯이" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended - For printing and sharing, as Excel prints it"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추천 - 인쇄/공유용, 엑셀에서 인쇄하듯이"
+          }
+        }
+      }
+    },
+    "추천 - 인쇄/공유용, 쪽으로 나눠서" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended - For printing and sharing, split into pages"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추천 - 인쇄/공유용, 쪽으로 나눠서"
+          }
+        }
+      }
+    },
+    "추천 - 쪽마다 한 장씩" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended - One image per page"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추천 - 쪽마다 한 장씩"
+          }
+        }
+      }
+    },
+    "추천 - 투명한 곳은 투명하게" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended - Keeps transparency"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추천 - 투명한 곳은 투명하게"
+          }
+        }
+      }
+    },
+    "추천 · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended · %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추천 · %@"
+          }
+        }
+      }
+    },
+    "취소" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "취소"
+          }
+        }
+      }
+    },
+    "켜기…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn On…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "켜기…"
+          }
+        }
+      }
+    },
+    "켜짐" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "켜짐"
+          }
+        }
+      }
+    },
+    "클립보드 이미지 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clipboard Image %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "클립보드 이미지 %@"
+          }
+        }
+      }
+    },
+    "클립보드에 이미지나 파일이 없어요." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There's no image or file on the clipboard."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "클립보드에 이미지나 파일이 없어요."
+          }
+        }
+      }
+    },
+    "클립보드에서 가져온 이미지예요. 어디에 저장할까요?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This image is from the clipboard. Where do you want to save it?"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "클립보드에서 가져온 이미지예요. 어디에 저장할까요?"
+          }
+        }
+      }
+    },
+    "파일 열기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Files"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파일 열기"
+          }
+        }
+      }
+    },
+    "파일을 읽을 수 없어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't read the file"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파일을 읽을 수 없어요"
+          }
+        }
+      }
+    },
+    "폴더 허용..." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow Folder…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더 허용..."
+          }
+        }
+      }
+    },
+    "표 파일이 아니거나 손상됐어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not a spreadsheet, or it's damaged"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "표 파일이 아니거나 손상됐어요"
+          }
+        }
+      }
+    },
+    "하나 더 던지기" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drop Another"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하나 더 던지기"
+          }
+        }
+      }
+    },
+    "한 장씩 문서로" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A document, one page per image"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 장씩 문서로"
+          }
+        }
+      }
+    },
+    "합치지 못했어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't combine"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "합치지 못했어요"
+          }
+        }
+      }
+    },
+    "합친 PDF를 어디에 저장할까요?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Where do you want to save the combined PDF?"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "합친 PDF를 어디에 저장할까요?"
+          }
+        }
+      }
+    },
+    "합친 파일" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combined"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "합친 파일"
+          }
+        }
+      }
+    },
+    "합칠 파일이 없어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There are no files to combine"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "합칠 파일이 없어요"
+          }
+        }
+      }
+    },
+    "허용" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "허용"
+          }
+        }
+      }
+    },
+    "허용한 폴더가 없어요" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No folders allowed yet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "허용한 폴더가 없어요"
+          }
+        }
+      }
+    },
+    "화면 글꼴" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interface font"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화면 글꼴"
+          }
+        }
+      }
+    },
+    "화질 그대로, 투명도 유지" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Same quality, keeps transparency"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화질 그대로, 투명도 유지"
+          }
+        }
+      }
+    },
+    "화질은 그대로, 용량은 절반" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Same quality, half the size"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화질은 그대로, 용량은 절반"
+          }
+        }
+      }
+    },
+    "확대해도 선명하게" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sharp at any size"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확대해도 선명하게"
+          }
+        }
+      }
+    },
+    "확장자·파일 이름 글꼴" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Font for extensions and file names"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확장자·파일 이름 글꼴"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

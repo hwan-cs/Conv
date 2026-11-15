@@ -40,7 +40,7 @@ public final class MenuBarController: NSObject {
         }
         if let progress {
             button.image = Self.ring(progress)
-            button.toolTip = "바꾸는 중 \(Int(progress * 100))%"
+            button.toolTip = String(localized: "바꾸는 중 \(Int(progress * 100))%")
         } else {
             button.image = Self.glyph
             button.toolTip = nil
@@ -115,7 +115,7 @@ public final class MenuBarController: NSObject {
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "Conv: 바꾸는 중"
+        image.accessibilityDescription = String(localized: "Conv: 바꾸는 중")
         return image
     }
 

@@ -28,8 +28,8 @@ public final class FolderAccess {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
-        panel.message = "Finder에서 바로 바꿀 폴더를 고르세요. 그 안의 파일은 다시 묻지 않고 바꿔요."
-        panel.prompt = "허용"
+        panel.message = String(localized: "Finder에서 바로 바꿀 폴더를 고르세요. 그 안의 파일은 다시 묻지 않고 바꿔요.")
+        panel.prompt = String(localized: "허용")
         guard panel.runModal() == .OK, let folder = panel.url else {
             return
         }

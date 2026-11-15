@@ -109,13 +109,13 @@ public final class QuietConversions: NSObject {
         } catch let error as ConversionClient.Failure {
             return .failure(Reason(error.description))
         } catch {
-            return .failure(Reason("파일을 읽을 수 없어요"))
+            return .failure(Reason(String(localized: "파일을 읽을 수 없어요")))
         }
         defer { try? combined.close() }
         do {
             return .success(try SiblingWriter.copyCombined(combined, of: files, extension: format, keepingBoth: true))
         } catch {
-            return .failure(Reason("저장하지 못했어요"))
+            return .failure(Reason(String(localized: "저장하지 못했어요")))
         }
     }
 
@@ -130,12 +130,12 @@ public final class QuietConversions: NSObject {
         } catch let error as ConversionClient.Failure {
             return .failure(Reason(error.description))
         } catch {
-            return .failure(Reason("파일을 읽을 수 없어요"))
+            return .failure(Reason(String(localized: "파일을 읽을 수 없어요")))
         }
         do {
             return .success(try SiblingWriter.writePages(pages, nextTo: file, extension: format, keepingBoth: true))
         } catch {
-            return .failure(Reason("저장하지 못했어요"))
+            return .failure(Reason(String(localized: "저장하지 못했어요")))
         }
     }
 
@@ -153,7 +153,7 @@ public final class QuietConversions: NSObject {
         } catch let error as ConversionClient.Failure {
             return .failure(Reason(error.description))
         } catch {
-            return .failure(Reason("파일을 읽을 수 없어요"))
+            return .failure(Reason(String(localized: "파일을 읽을 수 없어요")))
         }
         defer {
             try? converted.close()
@@ -161,7 +161,7 @@ public final class QuietConversions: NSObject {
         do {
             return .success(try SiblingWriter.copyKeepingBoth(converted, nextTo: file, extension: format))
         } catch {
-            return .failure(Reason("저장하지 못했어요"))
+            return .failure(Reason(String(localized: "저장하지 못했어요")))
         }
     }
 
@@ -169,16 +169,16 @@ public final class QuietConversions: NSObject {
         let content = UNMutableNotificationContent()
         let format = job.format.uppercased()
         if combined {
-            content.title = written.isEmpty ? "합치지 못했어요" : "\(job.files.count)개를 \(format) 하나로 합쳤어요"
+            content.title = written.isEmpty ? String(localized: "합치지 못했어요") : String(localized: "\(job.files.count)개를 \(format) 하나로 합쳤어요")
             content.body = written.first?.lastPathComponent ?? failures.first?.1 ?? ""
         } else if failures.isEmpty {
-            content.title = written.count == 1 ? "\(format)로 바꿨어요" : "\(written.count)개를 \(format)로 바꿨어요"
+            content.title = written.count == 1 ? String(localized: "\(format)로 바꿨어요") : String(localized: "\(written.count)개를 \(format)로 바꿨어요")
             content.body = written.count == 1 ? written[0].lastPathComponent : written.map(\.lastPathComponent).joined(separator: ", ")
         } else if written.isEmpty {
-            content.title = "바꾸지 못했어요"
+            content.title = String(localized: "바꾸지 못했어요")
             content.body = failures.map { "\($0.0.lastPathComponent): \($0.1)" }.joined(separator: "\n")
         } else {
-            content.title = "\(job.files.count)개 중 \(written.count)개를 \(format)로 바꿨어요"
+            content.title = String(localized: "\(job.files.count)개 중 \(written.count)개를 \(format)로 바꿨어요")
             content.body = failures.map { "\($0.0.lastPathComponent): \($0.1)" }.joined(separator: "\n")
         }
         content.userInfo = ["reveal": (written.isEmpty ? job.files : written).map(\.path)]
