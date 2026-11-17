@@ -20,6 +20,7 @@ xcodebuild build \
     CODE_SIGN_IDENTITY="Developer ID Application" \
     PROVISIONING_PROFILE_SPECIFIER= \
     OTHER_CODE_SIGN_FLAGS="--timestamp" \
+    CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
     | grep -E "error:|BUILD"
 
 app=$build/Build/Products/Release/Conv.app

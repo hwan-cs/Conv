@@ -4,7 +4,7 @@ import ProjectDescriptionHelpers
 let appBundleID = "\(Conv.bundleIDPrefix).Conv"
 /// Embedded bundles must carry the same version as the app.
 let version: [String: Plist.Value] = [
-    "CFBundleShortVersionString": "0.1.0",
+    "CFBundleShortVersionString": "1.0.0",
     "CFBundleVersion": "1",
 ]
 let localizable: ResourceFileElement = "Localization/Localizable.xcstrings"
@@ -16,11 +16,6 @@ let sandbox: Entitlements = .dictionary([
     "com.apple.security.files.bookmarks.app-scope": true,
 ])
 
-/// Files Conv opens, without claiming to be their default app, and the outputs it writes beside
-/// them. `NSIsRelatedItemType` is what lets the sandboxed app create "보고서.pdf" next to "보고서.docx".
-/// The entries have no `CFBundleTypeName`: Finder shows a claiming app's name as a file's kind
-/// when the default app gives none (it showed "Converted File" for every .mp4), and without one it
-/// falls back to the type's own description, "MPEG-4 movie".
 let documentTypes: Plist.Value = [
     [
         "CFBundleTypeRole": "Viewer",
@@ -32,7 +27,6 @@ let documentTypes: Plist.Value = [
             "org.openxmlformats.spreadsheetml.sheet",
             "public.svg-image",
         ],
-        // HWP has no system type to name.
         "CFBundleTypeExtensions": ["hwp", "hwpx"],
     ],
     [
@@ -59,6 +53,8 @@ let app = Target.target(
     infoPlist: .extendingDefault(with: version.merging([
         "CFBundleDisplayName": "Conv",
         "LSApplicationCategoryType": "public.app-category.utilities",
+        "NSHumanReadableCopyright": "Copyright © 2026 Jung Hwan Park",
+        "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDocumentTypes": documentTypes,
     ]) { $1 }),
     sources: ["App/Sources/**"],
@@ -77,8 +73,6 @@ let app = Target.target(
 )
 
 /// Runs the engines out of process so a crashing parser never takes the app down.
-/// WebKit's helper processes only launch from a sandboxed host that may use the network,
-/// even when the HTML is local.
 let conversionSandbox: Entitlements = .dictionary([
     "com.apple.security.app-sandbox": true,
     "com.apple.security.files.user-selected.read-write": true,
@@ -92,7 +86,6 @@ let conversionXPC = Target.target(
     bundleId: "\(appBundleID).ConversionXPC",
     deploymentTargets: Conv.deploymentTargets,
     infoPlist: .extendingDefault(with: version.merging([
-        // WebKit needs a real main run loop, not the default dispatch_main.
         "XPCService": ["ServiceType": "Application", "RunLoopType": "NSRunLoop"],
     ]) { $1 }),
     sources: ["XPC/Sources/**"],
@@ -106,7 +99,6 @@ let conversionXPC = Target.target(
         .module(.hwpEngine),
         .module(.mediaEngine),
     ],
-    // LAME is embedded as a dynamic library in the service's Frameworks folder.
     settings: .settings(base: Conv.baseSettings.merging(["LD_RUNPATH_SEARCH_PATHS": ["$(inherited)", "@executable_path/../Frameworks"]]) { $1 })
 )
 
@@ -123,14 +115,11 @@ let finderSync = Target.target(
             "NSExtensionPrincipalClass": "$(PRODUCT_MODULE_NAME).FinderSync",
         ],
     ]) { $1 }),
-    // An app extension can't link a static framework, so it compiles the two ConversionKit files
-    // it needs: the same format table the app uses, and the notification's name.
     sources: [
         "FinderSync/Sources/**",
         "../Core/ConversionKit/Sources/Formats.swift",
         "../Core/ConversionKit/Sources/FinderFormatNotification.swift",
     ],
-    // Sends paths only; the app reads them through folders the user allowed in Settings.
     resources: [localizable],
     entitlements: .dictionary(["com.apple.security.app-sandbox": true]),
     dependencies: [.sdk(name: "FinderSync", type: .framework)],
