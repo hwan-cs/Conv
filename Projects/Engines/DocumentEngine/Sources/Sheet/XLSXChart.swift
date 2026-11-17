@@ -188,7 +188,7 @@ struct XLSXChart {
                 let ownColor = usesLine ? lineColor ?? fillColor : fillColor ?? lineColor
 
                 var item = Series(
-                    name: Self.text(series.chart("tx"), cells: cells) ?? "계열\(index + 1)",
+                    name: Self.text(series.chart("tx"), cells: cells) ?? String(localized: "계열\(index + 1)"),
                     categories: categories,
                     values: values.values,
                     xValues: xValues,
@@ -285,7 +285,7 @@ struct XLSXChart {
         }
         axis.hasGridlines = element.chart("majorGridlines") != nil
         if let title = element.chart("title") {
-            axis.title = title.chart("tx").flatMap { text($0, cells: { _ in [] }) } ?? "축 제목"
+            axis.title = title.chart("tx").flatMap { text($0, cells: { _ in [] }) } ?? String(localized: "축 제목")
         }
         return axis
     }

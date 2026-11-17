@@ -816,6 +816,22 @@
         }
       }
     },
+    "계열%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Series%lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계열%lld"
+          }
+        }
+      }
+    },
     "고른 곳에 저장했어요." : {
       "localizations" : {
         "en" : {
@@ -1932,6 +1948,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "추천 · %@"
+          }
+        }
+      }
+    },
+    "축 제목" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Axis Title"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "축 제목"
           }
         }
       }
