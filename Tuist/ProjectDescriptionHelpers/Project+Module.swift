@@ -12,6 +12,8 @@ public enum Conv {
         "ENABLE_USER_SCRIPT_SANDBOXING": "YES",
         "DEAD_CODE_STRIPPING": "YES",
         "DEVELOPMENT_TEAM": .string(developmentTeam),
+        "CODE_SIGN_IDENTITY": "Apple Development",
+        "CODE_SIGN_STYLE": "Automatic",
         // Notarization requires the hardened runtime.
         "ENABLE_HARDENED_RUNTIME": "YES",
     ]

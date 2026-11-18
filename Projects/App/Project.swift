@@ -5,7 +5,7 @@ let appBundleID = "\(Conv.bundleIDPrefix).Conv"
 /// Embedded bundles must carry the same version as the app.
 let version: [String: Plist.Value] = [
     "CFBundleShortVersionString": "1.0.0",
-    "CFBundleVersion": "1",
+    "CFBundleVersion": "2",
 ]
 let localizable: ResourceFileElement = "Localization/Localizable.xcstrings"
 
