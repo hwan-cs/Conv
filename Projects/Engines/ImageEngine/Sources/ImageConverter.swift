@@ -20,6 +20,8 @@ public struct ImageConverter: Sendable {
 
     public var quality = 0.9
 
+    private static let avif = UTType("public.avif")
+
     public init() {}
 
     public func convert(_ input: URL, to output: URL) throws {
@@ -29,7 +31,7 @@ public struct ImageConverter: Sendable {
         }
         guard let source = CGImageSourceCreateWithURL(input as CFURL, nil),
               CGImageSourceGetCount(source) > 0,
-              CGImageSourceCreateImageAtIndex(source, 0, nil) != nil
+              Self.decodes(source, at: CGImageSourceGetPrimaryImageIndex(source))
         else {
             throw ConversionError.unreadable
         }
@@ -38,78 +40,238 @@ public struct ImageConverter: Sendable {
             try writePDF(source, to: output)
             return
         }
-        // Animation survives only into GIF; every other format takes the first frame.
-        let frames = type == .gif ? CGImageSourceGetCount(source) : 1
-        guard let destination = CGImageDestinationCreateWithURL(output as CFURL, type.identifier as CFString, frames, nil) else {
+        // Only GIF keeps animation; others take the primary image, which a HEIC need not store first.
+        let frames = type == .gif && Self.isAnimated(source)
+            ? Array(0..<CGImageSourceGetCount(source))
+            : [CGImageSourceGetPrimaryImageIndex(source)]
+        guard let destination = CGImageDestinationCreateWithURL(output as CFURL, type.identifier as CFString, frames.count, nil) else {
             throw ConversionError.unsupportedOutput(ext)
         }
-        let options: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: quality]
-        let dropsAlpha = type == .jpeg || type == .bmp
-        for index in 0..<frames {
-            if dropsAlpha, Self.hasAlpha(source, at: index), let image = CGImageSourceCreateImageAtIndex(source, index, nil) {
-                guard let flattened = Self.flattened(image) else {
-                    throw ConversionError.encodingFailed
-                }
-                let properties = (CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any]) ?? [:]
-                CGImageDestinationAddImage(destination, flattened, properties.merging(options) { $1 } as CFDictionary)
-            } else {
-                CGImageDestinationAddImageFromSource(destination, source, index, options as CFDictionary)
+        if frames.count > 1 {
+            let loop = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: Self.loopCount(source)]]
+            CGImageDestinationSetProperties(destination, loop as CFDictionary)
+        }
+        let opaque = type == .jpeg || type == .bmp
+        for index in frames {
+            let properties = (CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any]) ?? [:]
+            var options: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: quality]
+            if frames.count > 1, let delay = Self.delay(properties) {
+                options[kCGImagePropertyGIFDictionary] = [kCGImagePropertyGIFDelayTime: delay, kCGImagePropertyGIFUnclampedDelayTime: delay]
             }
+            // AVIF drops the orientation tag, so the pixels are turned instead.
+            let upright = type == Self.avif && Self.orientation(properties) != .up
+            let redraws = upright || (opaque && Self.hasAlpha(properties)) || Self.needsRedraw(properties, of: source, into: type)
+            guard redraws else {
+                CGImageDestinationAddImageFromSource(destination, source, index, options as CFDictionary)
+                continue
+            }
+            guard let image = Self.redrawn(source, at: index, opaque: opaque, upright: upright) else {
+                throw ConversionError.encodingFailed
+            }
+            CGImageDestinationAddImage(destination, image, Self.metadata(properties, upright: upright).merging(options) { $1 } as CFDictionary)
         }
         guard CGImageDestinationFinalize(destination) else {
             throw ConversionError.encodingFailed
         }
     }
 
-    /// One page per frame, each the image's size at its own resolution, upright.
+    /// One page per frame, each the image's size at its own resolution, upright. The main image comes first.
     private func writePDF(_ source: CGImageSource, to output: URL) throws {
-        guard let context = CGContext(output as CFURL, mediaBox: nil, nil) else { throw ConversionError.encodingFailed }
-        for index in 0..<CGImageSourceGetCount(source) {
-            guard let image = Self.upright(source, at: index) else {
+        guard let context = CGContext(output as CFURL, mediaBox: nil, nil) else {
+            throw ConversionError.encodingFailed
+        }
+        let primary = CGImageSourceGetPrimaryImageIndex(source)
+        let frames = [primary] + (0..<CGImageSourceGetCount(source)).filter { $0 != primary }
+        var pages = 0
+        for index in frames {
+            guard Self.decodes(source, at: index), let image = CGImageSourceCreateImageAtIndex(source, index, nil) else {
                 continue
             }
             let properties = (CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any]) ?? [:]
-            let dpi = (properties[kCGImagePropertyDPIWidth] as? Double).flatMap { $0 > 0 ? $0 : nil } ?? 72
-            var box = CGRect(x: 0, y: 0, width: Double(image.width) * 72 / dpi, height: Double(image.height) * 72 / dpi)
+            let orientation = Self.orientation(properties)
+            let pixels = Self.uprightSize(of: image, orientation)
+            var box = CGRect(origin: .zero, size: Self.pageSize(pixels, dpi: properties[kCGImagePropertyDPIWidth] as? Double))
             context.beginPage(mediaBox: &box)
-            context.draw(image, in: box)
+            context.scaleBy(x: box.width / pixels.width, y: box.height / pixels.height)
+            Self.draw(image, upright: orientation, in: context)
             context.endPage()
+            pages += 1
         }
         context.closePDF()
+        guard pages > 0 else {
+            throw ConversionError.unreadable
+        }
     }
 
-    private static func hasAlpha(_ source: CGImageSource, at index: Int) -> Bool {
-        let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any]
-        return properties?[kCGImagePropertyHasAlpha] as? Bool ?? false
+    /// Page size in points, at 72 dpi when the resolution is missing or gives a page PDF viewers refuse.
+    static func pageSize(_ pixels: CGSize, dpi: Double?) -> CGSize {
+        let scale = 72 / (dpi.flatMap { $0 > 0 ? $0 : nil } ?? 72)
+        let size = CGSize(width: pixels.width * scale, height: pixels.height * scale)
+        guard max(size.width, size.height) <= 14_400, min(size.width, size.height) >= 1 else {
+            let fit = min(1, 14_400 / max(pixels.width, pixels.height))
+            return CGSize(width: max(pixels.width * fit, 1), height: max(pixels.height * fit, 1))
+        }
+        return size
     }
 
-    private static func flattened(_ image: CGImage) -> CGImage? {
+    /// ImageIO returns an image even for HEIF or TIFF it can't decode (4:2:2 AVIF); only missing pixel data tells.
+    private static func decodes(_ source: CGImageSource, at index: Int) -> Bool {
+        guard let image = CGImageSourceCreateImageAtIndex(source, index, nil) else {
+            return false
+        }
+        guard isHEIF(source) || (CGImageSourceGetType(source) as String?) == UTType.tiff.identifier else {
+            return true
+        }
+        return autoreleasepool {
+            image.dataProvider?.data != nil
+        }
+    }
+
+    /// HEIC, HEIF and AVIF alike: `public.heic` doesn't conform to `.heif`, only to this.
+    private static let heifFamily = UTType("public.heif-standard")
+
+    private static func isHEIF(_ source: CGImageSource) -> Bool {
+        let type = (CGImageSourceGetType(source) as String?).flatMap(UTType.init)
+        return type.map { type in heifFamily.map(type.conforms) ?? false || type == avif } ?? false
+    }
+
+    private static func hasAlpha(_ properties: [CFString: Any]) -> Bool {
+        properties[kCGImagePropertyHasAlpha] as? Bool ?? false
+    }
+
+    /// Pixels the encoder would refuse or garble, which are redrawn as 8-bit RGB first.
+    private static func needsRedraw(_ properties: [CFString: Any], of source: CGImageSource, into type: UTType) -> Bool {
+        let depth = properties[kCGImagePropertyDepth] as? Int ?? 8
+        let model = properties[kCGImagePropertyColorModel] as? String
+        let fromHEIF = isHEIF(source)
+        if ![8, 16].contains(depth), !(fromHEIF && [10, 12].contains(depth)) {
+            return true
+        }
+        // The JPEG encoder garbles some decoded HEIF frames; redrawn ones encode correctly.
+        if type == .bmp || (type == .jpeg && fromHEIF) {
+            return true
+        }
+        return (type == .heic || type == avif) && model != kCGImagePropertyColorModelRGB as String
+    }
+
+    private static func redrawn(_ source: CGImageSource, at index: Int, opaque: Bool, upright: Bool) -> CGImage? {
+        guard let image = CGImageSourceCreateImageAtIndex(source, index, nil) else {
+            return nil
+        }
+        let properties = (CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any]) ?? [:]
+        let orientation = upright ? Self.orientation(properties) : .up
+        let size = uprightSize(of: image, orientation)
         let space = image.colorSpace.flatMap { $0.model == .rgb ? $0 : nil } ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        let alpha: CGImageAlphaInfo = opaque || !hasAlpha(properties) ? .noneSkipLast : .premultipliedLast
         guard let context = CGContext(
-            data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
-            space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            data: nil, width: Int(size.width), height: Int(size.height), bitsPerComponent: 8, bytesPerRow: 0,
+            space: space, bitmapInfo: alpha.rawValue
         ) else {
             return nil
         }
-        let rect = CGRect(x: 0, y: 0, width: image.width, height: image.height)
-        context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
-        context.fill(rect)
-        context.draw(image, in: rect)
+        if opaque {
+            context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+        draw(image, upright: orientation, in: context)
         return context.makeImage()
     }
 
-    /// The frame with its EXIF orientation applied, since a PDF page has no orientation tag.
-    private static func upright(_ source: CGImageSource, at index: Int) -> CGImage? {
-        let properties = (CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any]) ?? [:]
-        let width = properties[kCGImagePropertyPixelWidth] as? Int ?? 0
-        let height = properties[kCGImagePropertyPixelHeight] as? Int ?? 0
-        // A "thumbnail" at full size is ImageIO's way to get the frame with its orientation applied.
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: max(width, height, 1),
+    private static func metadata(_ properties: [CFString: Any], upright: Bool) -> [CFString: Any] {
+        let keys = [
+            kCGImagePropertyExifDictionary, kCGImagePropertyGPSDictionary, kCGImagePropertyIPTCDictionary,
+            kCGImagePropertyTIFFDictionary, kCGImagePropertyDPIWidth, kCGImagePropertyDPIHeight, kCGImagePropertyOrientation,
         ]
-        return CGImageSourceCreateThumbnailAtIndex(source, index, options as CFDictionary)
-            ?? CGImageSourceCreateImageAtIndex(source, index, nil)
+        var metadata = properties.filter { keys.contains($0.key) }
+        if upright {
+            metadata[kCGImagePropertyOrientation] = CGImagePropertyOrientation.up.rawValue
+            var tiff = metadata[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
+            tiff?[kCGImagePropertyTIFFOrientation] = CGImagePropertyOrientation.up.rawValue
+            metadata[kCGImagePropertyTIFFDictionary] = tiff
+        }
+        return metadata
+    }
+
+    private static func orientation(_ properties: [CFString: Any]) -> CGImagePropertyOrientation {
+        (properties[kCGImagePropertyOrientation] as? UInt32).flatMap(CGImagePropertyOrientation.init) ?? .up
+    }
+
+    private static func uprightSize(of image: CGImage, _ orientation: CGImagePropertyOrientation) -> CGSize {
+        switch orientation {
+        case .left, .leftMirrored, .right, .rightMirrored:
+            CGSize(width: image.height, height: image.width)
+        default:
+            CGSize(width: image.width, height: image.height)
+        }
+    }
+
+    private static func draw(_ image: CGImage, upright orientation: CGImagePropertyOrientation, in context: CGContext) {
+        let width = CGFloat(image.width)
+        let height = CGFloat(image.height)
+        // Core Graphics' origin is bottom-left, so each EXIF turn is mirrored vertically from its usual form.
+        let transform: CGAffineTransform = switch orientation {
+        case .up:
+            .identity
+        case .upMirrored:
+            CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: width, ty: 0)
+        case .down:
+            CGAffineTransform(a: -1, b: 0, c: 0, d: -1, tx: width, ty: height)
+        case .downMirrored:
+            CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: height)
+        case .leftMirrored:
+            CGAffineTransform(a: 0, b: -1, c: -1, d: 0, tx: height, ty: width)
+        case .right:
+            CGAffineTransform(a: 0, b: -1, c: 1, d: 0, tx: 0, ty: width)
+        case .rightMirrored:
+            CGAffineTransform(a: 0, b: 1, c: 1, d: 0, tx: 0, ty: 0)
+        case .left:
+            CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: height, ty: 0)
+        }
+        context.saveGState()
+        context.concatenate(transform)
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        context.restoreGState()
+    }
+
+    private static var animations: [(dictionary: CFString, delay: CFString, unclamped: CFString, loop: CFString)] {
+        [
+            (kCGImagePropertyGIFDictionary, kCGImagePropertyGIFDelayTime, kCGImagePropertyGIFUnclampedDelayTime, kCGImagePropertyGIFLoopCount),
+            (kCGImagePropertyPNGDictionary, kCGImagePropertyAPNGDelayTime, kCGImagePropertyAPNGUnclampedDelayTime, kCGImagePropertyAPNGLoopCount),
+            (kCGImagePropertyWebPDictionary, kCGImagePropertyWebPDelayTime, kCGImagePropertyWebPUnclampedDelayTime, kCGImagePropertyWebPLoopCount),
+            (kCGImagePropertyHEICSDictionary, kCGImagePropertyHEICSDelayTime, kCGImagePropertyHEICSUnclampedDelayTime, kCGImagePropertyHEICSLoopCount),
+        ]
+    }
+
+    /// Frames with timing, unlike TIFF pages or the separate pictures of a HEIC.
+    private static func isAnimated(_ source: CGImageSource) -> Bool {
+        guard CGImageSourceGetCount(source) > 1 else {
+            return false
+        }
+        let properties = (CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]) ?? [:]
+        return delay(properties) != nil
+    }
+
+    private static func delay(_ properties: [CFString: Any]) -> Double? {
+        for animation in animations {
+            guard let frame = properties[animation.dictionary] as? [CFString: Any] else {
+                continue
+            }
+            if let delay = (frame[animation.unclamped] as? Double).flatMap({ $0 > 0 ? $0 : nil }) ?? frame[animation.delay] as? Double {
+                return delay
+            }
+        }
+        return nil
+    }
+
+    /// 0 is forever.
+    private static func loopCount(_ source: CGImageSource) -> Int {
+        let properties = (CGImageSourceCopyProperties(source, nil) as? [CFString: Any]) ?? [:]
+        for animation in animations {
+            if let loop = (properties[animation.dictionary] as? [CFString: Any])?[animation.loop] as? Int {
+                return loop
+            }
+        }
+        return 0
     }
 }
