@@ -100,6 +100,54 @@ import Testing
         )
     }
 
+    @Test func pdfKeepsAFadeToTransparent() async throws {
+        let faded = directory.appending(path: "fade.svg")
+        try Data("""
+            <svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">
+            <defs><linearGradient id="g"><stop offset="0" stop-color="red"/><stop offset="1" stop-color="red" stop-opacity="0"/></linearGradient></defs>
+            <rect width="200" height="100" fill="url(#g)"/>
+            </svg>
+            """.utf8
+        ).write(to: faded)
+        let output = directory.appending(path: "fade.pdf")
+        try await SVGConverter().convert(
+            faded,
+            to: output
+        )
+        let page = try #require(PDFDocument(url: output)?.page(at: 0))
+        #expect(page.bounds(for: .mediaBox).size == CGSize(width: 200, height: 100))
+        let thumbnail = page.thumbnail(
+            of: CGSize(width: 200, height: 100),
+            for: .mediaBox
+        )
+        let bitmap = try #require(thumbnail.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)))
+        let left = try #require(bitmap.colorAt(x: 5, y: 50)?.usingColorSpace(.sRGB))
+        let right = try #require(bitmap.colorAt(x: 195, y: 50)?.usingColorSpace(.sRGB))
+        #expect(left.redComponent > 0.9 && left.greenComponent < 0.3, "expected red, got \(left)")
+        #expect(right.greenComponent > 0.8, "expected the fade, got \(right)")
+    }
+
+    @Test func fadeIsToldFromSolidStops() {
+        #expect(SVGConverter.fadesToTransparent(Data("<stop stop-opacity=\"0\"/>".utf8)))
+        #expect(SVGConverter.fadesToTransparent(Data("<stop style=\"stop-opacity:.4\"/>".utf8)))
+        #expect(SVGConverter.fadesToTransparent(Data("<stop stop-color=\"rgba(0,0,0,0)\"/>".utf8)))
+        #expect(!SVGConverter.fadesToTransparent(Data("<stop stop-opacity=\"1\"/><stop stop-opacity=\"1.0\"/>".utf8)))
+        #expect(!SVGConverter.fadesToTransparent(Data("<stop stop-color=\"#ff0000\"/>".utf8)))
+    }
+
+    @Test func hugePDFPageIsShrunkToTheLimit() async throws {
+        let huge = directory.appending(path: "huge.svg")
+        try Data("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"50000\" height=\"25000\" viewBox=\"0 0 2 1\"><rect width=\"2\" height=\"1\" fill=\"navy\"/></svg>".utf8)
+            .write(to: huge)
+        let output = directory.appending(path: "huge.pdf")
+        try await SVGConverter().convert(
+            huge,
+            to: output
+        )
+        let page = try #require(PDFDocument(url: output)?.page(at: 0)).bounds(for: .mediaBox)
+        #expect((page.width, page.height) == (14_400, 7_200))
+    }
+
     @Test func largeSVGIsCappedInPixels() async throws {
         let large = directory.appending(path: "large.svg")
         try Data("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"6000\" height=\"3000\"><rect width=\"6000\" height=\"3000\"/></svg>".utf8)

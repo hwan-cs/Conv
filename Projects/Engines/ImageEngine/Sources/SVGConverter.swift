@@ -5,7 +5,8 @@ import WebKit
 
 /// .svg → PNG, JPEG or PDF. AppKit draws the SVG into pixels at twice its size, larger for small
 /// icons, so the image is crisp. WebKit draws it into a PDF as vectors, so it stays sharp at any
-/// zoom: AppKit's PDFs lose fills under gradients that fade to transparent.
+/// zoom: AppKit's PDFs lose fills under gradients that fade to transparent. WebKit's lose the fade
+/// itself, so an SVG with one goes into its PDF as AppKit's pixels.
 public struct SVGConverter: Sendable {
     public enum ConversionError: Error, Equatable {
         case unreadable
@@ -40,11 +41,20 @@ public struct SVGConverter: Sendable {
             throw ConversionError.unreadable
         }
         if type == .pdf {
-            try await writePDF(
-                input,
-                size: image.size,
-                to: output
-            )
+            let page = Self.pageSize(image.size)
+            if try Self.fadesToTransparent(Data(contentsOf: input)) {
+                try writeRasterPDF(
+                    image,
+                    page: page,
+                    to: output
+                )
+            } else {
+                try await writePDF(
+                    input,
+                    size: page,
+                    to: output
+                )
+            }
         } else {
             try writeImage(
                 image,
@@ -88,11 +98,79 @@ public struct SVGConverter: Sendable {
         try data.write(to: output)
     }
 
+    /// Capped at the 14,400 points a side PDF viewers accept.
+    static func pageSize(_ size: CGSize) -> CGSize {
+        let fit = min(1, 14_400 / max(size.width, size.height))
+        return CGSize(
+            width: max(size.width * fit, 1),
+            height: max(size.height * fit, 1)
+        )
+    }
+
+    /// WebKit's PDFs drop the transparency of gradient stops, so a fade to clear prints solid.
+    static func fadesToTransparent(_ svg: Data) -> Bool {
+        let text = String(decoding: svg, as: UTF8.self)
+        let clearStop = /stop-opacity\s*[=:]\s*["']?\s*(0*\.[0-9]+|0+)(?![0-9.])/.ignoresCase()
+        let clearColor = /stop-color\s*[=:]\s*["']?\s*(transparent|rgba|hsla|#[0-9a-f]{8}(?![0-9a-f])|#[0-9a-f]{4}(?![0-9a-f]))/.ignoresCase()
+        return text.contains(clearStop) || text.contains(clearColor)
+    }
+
+    private func writeRasterPDF(
+        _ image: NSImage,
+        page: CGSize,
+        to output: URL
+    ) throws {
+        let (rendered, _) = try render(
+            image,
+            opaque: false
+        )
+        var box = CGRect(origin: .zero, size: page)
+        guard let context = CGContext(output as CFURL, mediaBox: &box, nil) else {
+            throw ConversionError.encodingFailed
+        }
+        context.beginPage(mediaBox: &box)
+        context.interpolationQuality = .high
+        context.draw(
+            rendered,
+            in: box
+        )
+        context.endPage()
+        context.closePDF()
+    }
+
     private func writeImage(
         _ image: NSImage,
         as type: UTType,
         to output: URL
     ) throws {
+        let (rendered, scale) = try render(
+            image,
+            opaque: type == .jpeg
+        )
+        guard let destination = CGImageDestinationCreateWithURL(output as CFURL, type.identifier as CFString, 1, nil) else {
+            throw ConversionError.encodingFailed
+        }
+        // The resolution keeps the image the SVG's size when placed in a document.
+        let properties: [CFString: Any] = [
+            kCGImageDestinationLossyCompressionQuality: 0.9,
+            kCGImagePropertyDPIWidth: 72 * scale,
+            kCGImagePropertyDPIHeight: 72 * scale,
+        ]
+        CGImageDestinationAddImage(
+            destination,
+            rendered,
+            properties as CFDictionary
+        )
+        guard CGImageDestinationFinalize(destination) else {
+            throw ConversionError.encodingFailed
+        }
+    }
+
+    /// Twice the SVG's size, more for small icons; returns the scale too.
+    private func render(
+        _ image: NSImage,
+        opaque: Bool
+    ) throws -> (CGImage, Double) {
         let longest = max(image.size.width, image.size.height)
         let scale = min(
             max(2, Self.minimumSide / longest),
@@ -100,7 +178,6 @@ public struct SVGConverter: Sendable {
         )
         let width = max(1, Int((image.size.width * scale).rounded()))
         let height = max(1, Int((image.size.height * scale).rounded()))
-        let opaque = type == .jpeg
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(
                   data: nil,
@@ -138,25 +215,10 @@ public struct SVGConverter: Sendable {
             in: context,
             size: CGSize(width: width, height: height)
         )
-        guard let rendered = context.makeImage(),
-              let destination = CGImageDestinationCreateWithURL(output as CFURL, type.identifier as CFString, 1, nil)
-        else {
+        guard let rendered = context.makeImage() else {
             throw ConversionError.encodingFailed
         }
-        // The resolution keeps the image the SVG's size when placed in a document.
-        let properties: [CFString: Any] = [
-            kCGImageDestinationLossyCompressionQuality: 0.9,
-            kCGImagePropertyDPIWidth: 72 * scale,
-            kCGImagePropertyDPIHeight: 72 * scale,
-        ]
-        CGImageDestinationAddImage(
-            destination,
-            rendered,
-            properties as CFDictionary
-        )
-        guard CGImageDestinationFinalize(destination) else {
-            throw ConversionError.encodingFailed
-        }
+        return (rendered, scale)
     }
 
     private func draw(
