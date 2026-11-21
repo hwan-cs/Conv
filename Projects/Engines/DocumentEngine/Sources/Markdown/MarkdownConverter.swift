@@ -14,13 +14,14 @@ public struct MarkdownConverter {
 
     public init() {}
 
-    public func convert(_ input: URL, to output: URL) async throws {
+    /// - Parameter title: The page title when there's no heading: the original file's name.
+    public func convert(_ input: URL, to output: URL, title: String? = nil) async throws {
         guard let data = try? Data(contentsOf: input) else {
             throw ConversionError.unreadable
         }
-        let source = String(decoding: data, as: UTF8.self)
-        let title = input.deletingPathExtension().lastPathComponent
-        let html = Self.page(for: source, title: title)
+        // Notes saved on Windows are often CP949 or UTF-16.
+        let source = CSVTable.decode(data)
+        let html = Self.page(for: source, title: title ?? input.deletingPathExtension().lastPathComponent)
         switch output.pathExtension.lowercased() {
         case "html", "htm":
             try Data(html.utf8).write(to: output)
@@ -39,6 +40,10 @@ public struct MarkdownConverter {
     /// A complete page: the document's first heading (or the file name) as its title, GitHub-like
     /// styling, a dark scheme on screen and always light in print.
     static func page(for markdown: String, title fallback: String) -> String {
+        // So front matter is found after CRLF or CR line ends too.
+        let markdown = markdown
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
         let document = Document(parsing: withoutFrontMatter(markdown))
         let title = document.children.lazy.compactMap { ($0 as? Heading).flatMap { $0.level == 1 ? $0.plainText : nil } }.first ?? fallback
         var writer = MarkdownHTML()

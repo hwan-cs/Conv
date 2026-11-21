@@ -72,6 +72,11 @@ import Testing
         #expect(abs(selection.bounds(for: pdfPage).minX - page.margins.left) < 8)
     }
 
+    @Test func longerDocumentsGetLongerToPrint() {
+        #expect(PagedPDFRenderer.timeout(forHTMLBytes: 10_000) == .seconds(60))
+        #expect(PagedPDFRenderer.timeout(forHTMLBytes: 6_600_000) == .seconds(126))
+    }
+
     @Test func printThatOutlivesTheTimeoutThrowsAndLeavesNoFile() async throws {
         let output = try Self.outputURL("timeout.pdf")
         await #expect(throws: PagedPDFRenderer.RenderError.timedOut) {
@@ -506,6 +511,28 @@ extension HwpEquationTests {
         #expect(html.contains("<blockquote>"))
         // Front matter is metadata, not text.
         #expect(!html.contains("draft"))
+    }
+
+    @Test func frontMatterIsDroppedUnderAnyLineEnd() {
+        for lineEnd in ["\n", "\r\n", "\r"] {
+            let markdown = ["---", "title: 비밀", "---", "# 본문"].joined(separator: lineEnd)
+            let html = MarkdownConverter.page(for: markdown, title: "file")
+            #expect(!html.contains("비밀"), "line end \(lineEnd.debugDescription)")
+            #expect(html.contains("<h1 id=\"본문\">본문</h1>"))
+        }
+    }
+
+    @Test(arguments: [CSVTable.windowsKorean, .utf16])
+    func windowsEncodingsAreRead(encoding: String.Encoding) async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "md-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let input = directory.appending(path: "input.md")
+        try #require("본문입니다".data(using: encoding)).write(to: input)
+        let output = directory.appending(path: "out.html")
+        try await MarkdownConverter().convert(input, to: output, title: "회의록")
+        let html = try String(contentsOf: output, encoding: .utf8)
+        #expect(html.contains("<p>본문입니다</p>"))
+        #expect(html.contains("<title>회의록</title>"))
     }
 
     @Test func pdfIsPaginatedA4WithTheText() async throws {

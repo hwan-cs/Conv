@@ -56,15 +56,21 @@ public final class PagedPDFRenderer {
 
     static let physicalZoom = 15.0 / 16.0
 
+    static func timeout(forHTMLBytes bytes: Int) -> Duration {
+        .seconds(60 + bytes / 100_000)
+    }
+
+    /// - Parameter timeout: Defaults to a minute plus a second per 100 KB of HTML.
     public func render(
         html: String,
         baseURL: URL?,
         to output: URL,
         page: PageSetup = .a4,
         script: String? = nil,
-        timeout: Duration = .seconds(60)
+        timeout: Duration? = nil
     ) async throws {
         _ = NSApplication.shared
+        let timeout = timeout ?? Self.timeout(forHTMLBytes: html.utf8.count)
 
         let contentWidth = page.paperSize.width - page.margins.left - page.margins.right
         let frame = CGRect(x: 0, y: 0, width: contentWidth, height: page.paperSize.height)
