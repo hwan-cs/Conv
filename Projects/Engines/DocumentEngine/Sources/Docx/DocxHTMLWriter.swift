@@ -38,6 +38,9 @@ struct DocxHTMLWriter {
     /// Absolute tabs (`w:ptab`) align to the margin rather than to the next stop.
     private static let absoluteTabMarkers: [Character: String] = ["\u{E003}": "left", "\u{E004}": "center", "\u{E005}": "right"]
     private var field = FieldState()
+    /// Past `maxTableDepth`, tables are flattened to their paragraphs so deep nesting can't overflow the stack.
+    private var tableDepth = 0
+    private static let maxTableDepth = 32
 
     /// A complex field: `fldChar begin`, `instrText`, `fldChar separate`, cached result runs, `fldChar end`.
     private struct FieldState {
@@ -163,16 +166,14 @@ struct DocxHTMLWriter {
     /// Enough leading text to find the section in the rendered PDF.
     private static func firstText(_ elements: [XMLElement]) -> String? {
         var text = ""
-        func collect(_ element: XMLElement) {
-            guard text.count < 12 else {
-                return
-            }
+        // Iterative: tables can nest thousands deep.
+        var pending = Array(elements.reversed())
+        while let element = pending.popLast(), text.count < 12 {
             if element.localName == "t" {
                 text += (element.stringValue ?? "").replacingOccurrences(of: DocxPackage.blankTextMarker, with: "")
             }
-            element.elements.forEach(collect)
+            pending += element.elements.reversed()
         }
-        elements.forEach(collect)
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : String(trimmed.prefix(12))
     }
@@ -245,6 +246,8 @@ struct DocxHTMLWriter {
                     previousStyle: index > 0 ? Self.paragraphStyle(siblings[index - 1]) : nil,
                     nextStyle: index + 1 < siblings.count ? Self.paragraphStyle(siblings[index + 1]) : nil
                 )
+            case "tbl" where tableDepth >= Self.maxTableDepth:
+                flattened(element)
             case "tbl": table(element)
             case "sdt", "customXml": blocks(element.child("sdtContent")?.elements ?? element.elements)
             default: break
@@ -808,7 +811,21 @@ struct DocxHTMLWriter {
         var isContinuation: Bool
     }
 
+    private mutating func flattened(_ tbl: XMLElement) {
+        // NSXML's XPath doesn't match namespace-uri().
+        let paragraphs = ((try? tbl.nodes(forXPath: ".//*[local-name()='p']")) ?? [])
+            .compactMap { $0 as? XMLElement }
+            .filter { $0.uri == OOXMLNamespace.w }
+        for p in paragraphs {
+            paragraph(p, previousStyle: nil, nextStyle: nil)
+        }
+    }
+
     private mutating func table(_ tbl: XMLElement) {
+        tableDepth += 1
+        defer {
+            tableDepth -= 1
+        }
         let tblPr = tbl.child("tblPr")
         let tableStyle = tblPr?.child("tblStyle")?.value()
         let tableBorders = styles.tableBorders(styleID: tableStyle)

@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import PDFKit
 import Testing
+import ZIPFoundation
 @testable import DocumentEngine
 
 @MainActor
@@ -212,6 +213,49 @@ import Testing
             }
         }
         return total == 0 ? 0 : Double(dark) / Double(total)
+    }
+
+    @Test func deeplyNestedTablesKeepTheirTextWithoutOverflowingTheStack() async throws {
+        let directory = try Self.outputDirectory()
+        let input = directory.appending(path: "nested.docx")
+        try? FileManager.default.removeItem(at: input)
+        try FileManager.default.copyItem(at: Self.fixture("table"), to: input)
+        let depth = 3_000
+        let open = "<w:tbl><w:tr><w:tc>"
+        let close = "</w:tc></w:tr></w:tbl>"
+        let xml = """
+            <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>\
+            \(String(repeating: open, count: depth))<w:p><w:r><w:t>DEEPEST</w:t></w:r></w:p>\(String(repeating: close, count: depth))\
+            <w:p><w:r><w:t>AFTER</w:t></w:r></w:p></w:body></w:document>
+            """
+        let archive = try Archive(url: input, accessMode: .update)
+        if let entry = archive["word/document.xml"] {
+            try archive.remove(entry)
+        }
+        let data = Data(xml.utf8)
+        try archive.addEntry(with: "word/document.xml", type: .file, uncompressedSize: Int64(data.count)) { position, size in
+            data.subdata(in: Int(position)..<Int(position) + size)
+        }
+        let output = directory.appending(path: "nested.pdf")
+        try await DocxPDFConverter().convert(input, to: output)
+        let text = try #require(PDFDocument(url: output)).string ?? ""
+        #expect(text.contains("DEEPEST") && text.contains("AFTER"))
+    }
+
+    @Test func passwordProtectedDocxIsToldApart() async throws {
+        let directory = try Self.outputDirectory()
+        let input = directory.appending(path: "locked.docx")
+        var data = Data([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]) + Data(count: 504)
+        data += Data("EncryptionInfo".utf16.flatMap { [UInt8($0 & 0xFF), UInt8($0 >> 8)] })
+        try data.write(to: input)
+        await #expect(throws: DocxPDFConverter.ConversionError.passwordProtected) {
+            try await DocxPDFConverter().convert(input, to: directory.appending(path: "locked.pdf"))
+        }
+        try Data("not a docx".utf8).write(to: input)
+        await #expect(throws: DocxPDFConverter.ConversionError.unreadableDocument) {
+            try await DocxPDFConverter().convert(input, to: directory.appending(path: "locked.pdf"))
+        }
     }
 
     @Test func embeddedFontKeyUndoesItsOwnObfuscation() {

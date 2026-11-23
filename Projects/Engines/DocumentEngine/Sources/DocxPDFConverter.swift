@@ -4,14 +4,23 @@ import PDFKit
 /// .docx → paginated PDF: OOXML is read directly into HTML, then laid out by `PagedPDFRenderer`.
 @MainActor
 public struct DocxPDFConverter {
-    public enum ConversionError: Error {
+    public enum ConversionError: Error, Equatable {
         case unreadableIntermediate
+        case unreadableDocument
+        case passwordProtected
     }
 
     public init() {}
 
     public func convert(_ input: URL, to output: URL) async throws {
-        let document = try DocxHTMLWriter.convert(input)
+        let document: DocxHTMLWriter.Output
+        do {
+            document = try DocxHTMLWriter.convert(input)
+        } catch DocxPackage.PackageError.passwordProtected {
+            throw ConversionError.passwordProtected
+        } catch {
+            throw ConversionError.unreadableDocument
+        }
         let renderer = PagedPDFRenderer()
         let script = document.html.contains("data-columns=") ? DocxHTMLWriter.columnScript : nil
         guard !document.headerFooter.isEmpty else {

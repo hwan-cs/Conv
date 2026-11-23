@@ -192,6 +192,10 @@ extension ConversionServiceImpl {
             String(localized: "HWP \(version) 형식은 아직 못 읽어요")
         case HwpPDFConverter.ConversionError.unreadableDocument:
             String(localized: "HWP 파일이 아니거나 손상됐어요")
+        case DocxPDFConverter.ConversionError.passwordProtected:
+            String(localized: "암호가 걸린 DOCX는 바꿀 수 없어요")
+        case DocxPDFConverter.ConversionError.unreadableDocument:
+            String(localized: "DOCX 파일이 아니거나 손상됐어요")
         case PDFEngine.ConversionError.passwordProtected:
             String(localized: "암호가 걸린 PDF는 바꿀 수 없어요")
         case PDFEngine.ConversionError.unreadable:
