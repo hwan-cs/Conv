@@ -265,14 +265,14 @@ struct XLSXWorkbook {
         (root?.smlChildren("si") ?? []).map(richText)
     }
 
-    /// A string item's text: its own `t`, or its runs' `t`s, leaving out phonetic guides.
+    /// A string item's text: its own `t`, or its runs' `t`s, leaving out phonetic guides. Capped at Excel's cell limit.
     private static func richText(_ item: XMLElement) -> String {
         if let text = item.sml("t") {
-            return text.stringValue ?? ""
+            return XLSXWriter.fitted(text.stringValue ?? "")
         }
-        return item.smlChildren("r")
+        return XLSXWriter.fitted(item.smlChildren("r")
             .map { $0.sml("t")?.stringValue ?? "" }
-            .joined()
+            .joined())
     }
 
     private static func styles(_ root: XMLElement?, colors: SpreadsheetColors) -> [Style] {
@@ -397,7 +397,11 @@ struct XLSXWorkbook {
 
         var nextRow = 0
         for row in root.sml("sheetData")?.smlChildren("row") ?? [] {
-            let rowIndex = row.attributeValue("r").flatMap(Int.init).map { $0 - 1 } ?? nextRow
+            let number = row.attributeValue("r").flatMap(Int.init)
+            guard (1...XLSXWriter.maxRows).contains(number ?? 1) else {
+                continue
+            }
+            let rowIndex = number.map { $0 - 1 } ?? nextRow
             nextRow = rowIndex + 1
             if let height = row.attributeValue("ht").flatMap(Double.init) {
                 sheet.rowHeights[rowIndex] = height
@@ -409,6 +413,9 @@ struct XLSXWorkbook {
             for cell in row.smlChildren("c") {
                 let column = cell.attributeValue("r").flatMap { Self.position($0)?.column } ?? nextColumn
                 nextColumn = column + 1
+                guard rowIndex < XLSXWriter.maxRows, column < XLSXWriter.maxColumns else {
+                    continue
+                }
                 let style = cell.attributeValue("s").flatMap(Int.init) ?? 0
                 let format = styles.indices.contains(style) ? styles[style].numberFormat : 0
                 guard let value = Self.value(
@@ -504,7 +511,7 @@ struct XLSXWorkbook {
         case "inlineStr":
             return cell.sml("is").map { (richText($0), .text, nil) }
         case "str", "d":
-            return raw.map { ($0, .text, nil) }
+            return raw.map { (XLSXWriter.fitted($0), .text, nil) }
         case "b":
             return raw.map { ($0 == "1" ? "TRUE" : "FALSE", .boolean, nil) }
         case "e":
@@ -571,27 +578,30 @@ struct XLSXWorkbook {
                 .split(separator: ":")
                 .map { $0.filter { $0 != "$" } }
                 .compactMap { Int($0) }
-            if rows.count == 2, rows.allSatisfy({ $0 > 0 }) {
+            if rows.count == 2, rows.allSatisfy({ (1...XLSXWriter.maxRows).contains($0) }) {
                 return (min(rows[0], rows[1]) - 1)...(max(rows[0], rows[1]) - 1)
             }
         }
         return nil
     }
 
-    /// "AB12" → row 11, column 27.
+    /// "AB12" → row 11, column 27. Nil outside Excel's sheet limits.
     static func position(_ reference: String) -> (row: Int, column: Int)? {
         var column = 0
         var digits = ""
         for character in reference.uppercased() {
             if let ascii = character.asciiValue, (65...90).contains(ascii), digits.isEmpty {
                 column = column * 26 + Int(ascii - 64)
+                guard column <= XLSXWriter.maxColumns else {
+                    return nil
+                }
             } else if character.isNumber {
                 digits.append(character)
             } else if character != "$" {
                 return nil
             }
         }
-        guard column > 0, let row = Int(digits), row > 0 else {
+        guard column > 0, let row = Int(digits), (1...XLSXWriter.maxRows).contains(row) else {
             return nil
         }
         return (row - 1, column - 1)
@@ -616,7 +626,7 @@ struct XLSXPackage {
         guard let data = try data(at: path) else {
             return nil
         }
-        return try XMLDocument(data: data).rootElement()
+        return try PackageXML.root(data)
     }
 
     func relationships(of part: String) throws -> [Relationship] {

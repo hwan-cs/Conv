@@ -29,6 +29,22 @@ import ZIPFoundation
         #expect(CSVTable.decode(data) == "a,b")
     }
 
+    @Test func utf16WithoutByteOrderMarkIsRead() throws {
+        let little = try #require("이름,age\n홍길동,30\n".data(using: .utf16LittleEndian))
+        let big = try #require("이름,age\n홍길동,30\n".data(using: .utf16BigEndian))
+        #expect(CSVTable.decode(little) == "이름,age\n홍길동,30\n")
+        #expect(CSVTable.decode(big) == "이름,age\n홍길동,30\n")
+    }
+
+    @Test func excelSeparatorLineIsHonoredAndDropped() throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "sep-\(UUID().uuidString).csv")
+        defer {
+            try? FileManager.default.removeItem(at: url)
+        }
+        try Data("sep=;\r\nname;value\r\na;1,5\r\n".utf8).write(to: url)
+        #expect(try CSVTable(contentsOf: url).rows == [["name", "value"], ["a", "1,5"]])
+    }
+
     @Test(arguments: [
         ("a;b;c\n1;2;3", ";" as Character),
         ("a\tb\tc\n1\t2\t3", "\t"),
@@ -52,6 +68,39 @@ import ZIPFoundation
     }
 }
 
+@Suite struct PackageXMLTests {
+    @Test func documentTypeDeclarationsAreRefused() {
+        let bomb = Data("""
+            <?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;">]>
+            <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>&lol2;</t></si></sst>
+            """.utf8)
+        #expect(throws: PackageXML.XMLError.documentTypeDeclaration) {
+            try PackageXML.root(bomb)
+        }
+    }
+
+    @Test func strictNamespacesReadAsTransitional() throws {
+        let strict = Data("""
+            <workbook xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"             xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships"><sheets/></workbook>
+            """.utf8)
+        let root = try #require(try PackageXML.root(strict))
+        #expect(root.uri == SpreadsheetNamespace.main)
+        #expect(root.namespace(forPrefix: "r")?.stringValue == OOXMLNamespace.r)
+    }
+
+    @Test(arguments: [
+        ("A1", true),
+        ("XFD1048576", true),
+        ("A1048577", false),
+        ("XFE1", false),
+        ("ZZZZZZZZZZZZZZZZZZZZ1", false),
+        ("A99999999999999999999999", false),
+    ])
+    func cellReferencesStayInsideASheet(reference: String, valid: Bool) {
+        #expect((XLSXWorkbook.position(reference) != nil) == valid)
+    }
+}
+
 @Suite struct XLSXWriterTests {
     @Test(arguments: [
         ("42", true),
@@ -66,6 +115,29 @@ import ZIPFoundation
     ])
     func onlyNumbersExcelKeepsExactlyBecomeNumbers(text: String, isNumber: Bool) {
         #expect(XLSXWriter.isNumber(text) == isNumber)
+    }
+
+    @Test(arguments: [
+        ("0", true),
+        ("-0", true),
+        ("1.", false),
+        (".5", false),
+        ("-", false),
+        ("00.5", false),
+        ("0.000000000000000001", true),
+        ("１２", false),
+    ])
+    func numberEdgesMatchTheRule(text: String, isNumber: Bool) {
+        #expect(XLSXWriter.isNumber(text) == isNumber)
+    }
+
+    @Test func cellsAreCutToWhatExcelHolds() {
+        let long = String(repeating: "가", count: 40_000)
+        #expect(XLSXWriter.fitted(long).utf16.count == XLSXWriter.maxCellLength)
+        // An emoji is two UTF-16 units.
+        let emoji = String(repeating: "a", count: XLSXWriter.maxCellLength - 1) + "😀"
+        #expect(XLSXWriter.fitted(emoji).utf16.count == XLSXWriter.maxCellLength - 1)
+        #expect(XLSXWriter.fitted("짧음") == "짧음")
     }
 
     @Test(arguments: [

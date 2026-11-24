@@ -10,6 +10,8 @@ struct XLSXWriter {
 
     static let maxRows = 1_048_576
     static let maxColumns = 16_384
+    /// Excel's per-cell character limit.
+    static let maxCellLength = 32_767
 
     let rows: [[String]]
     let sheetName: String
@@ -26,7 +28,8 @@ struct XLSXWriter {
         var sheetData = ""
         for (rowIndex, row) in rows.enumerated() {
             var cells = ""
-            for (column, value) in row.enumerated() where !value.isEmpty {
+            for (column, whole) in row.enumerated() where !whole.isEmpty {
+                let value = Self.fitted(whole)
                 let reference = Self.columnName(column) + String(rowIndex + 1)
                 if Self.isNumber(value) {
                     cells += "<c r=\"\(reference)\"><v>\(value)</v></c>"
@@ -155,14 +158,53 @@ struct XLSXWriter {
 
     /// A number Excel would store exactly and show the same way: no leading zeros, signs other
     /// than minus, exponents or more than 15 significant digits.
+    /// Scanned by hand: a regex here dominated large conversions.
     static func isNumber(_ text: String) -> Bool {
-        guard text.wholeMatch(of: /-?(0|[1-9][0-9]*)(\.[0-9]+)?/) != nil else {
+        let isDigit = { (byte: UInt8) in
+            byte >= UInt8(ascii: "0") && byte <= UInt8(ascii: "9")
+        }
+        var rest = text.utf8[...]
+        if rest.first == UInt8(ascii: "-") {
+            rest = rest.dropFirst()
+        }
+        // -?(0|[1-9][0-9]*)(\.[0-9]+)?
+        let integer = rest.prefix(while: isDigit)
+        guard !integer.isEmpty, integer.count == 1 || integer.first != UInt8(ascii: "0") else {
             return false
         }
-        let significant = text
-            .filter(\.isNumber)
-            .drop { $0 == "0" }
+        rest = rest.dropFirst(integer.count)
+        if rest.first == UInt8(ascii: ".") {
+            rest = rest.dropFirst()
+            let fraction = rest.prefix(while: isDigit)
+            guard !fraction.isEmpty else {
+                return false
+            }
+            rest = rest.dropFirst(fraction.count)
+        }
+        guard rest.isEmpty else {
+            return false
+        }
+        let significant = text.utf8
+            .filter(isDigit)
+            .drop { $0 == UInt8(ascii: "0") }
         return significant.count <= 15
+    }
+
+    /// The text cut to Excel's cell limit in UTF-16 units, without splitting a character.
+    static func fitted(_ text: String) -> String {
+        guard text.utf16.count > maxCellLength else {
+            return text
+        }
+        var fitted = ""
+        var length = 0
+        for character in text {
+            length += character.utf16.count
+            guard length <= maxCellLength else {
+                break
+            }
+            fitted.append(character)
+        }
+        return fitted
     }
 
     /// 0 → "A", 25 → "Z", 26 → "AA".

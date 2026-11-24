@@ -7,6 +7,7 @@ import PDFKit
 public struct SheetConverter {
     public enum ConversionError: Error, Equatable {
         case unreadable
+        case passwordProtected
         case empty
         case tooLarge
         case unsupportedOutput(String)
@@ -62,7 +63,7 @@ public struct SheetConverter {
         do {
             return try XLSXWorkbook(url: input)
         } catch {
-            throw ConversionError.unreadable
+            throw DocxPackage.isEncrypted(input) ? ConversionError.passwordProtected : ConversionError.unreadable
         }
     }
 

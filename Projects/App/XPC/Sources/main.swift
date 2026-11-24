@@ -210,6 +210,8 @@ extension ConversionServiceImpl {
             String(localized: "SVG 파일이 아니거나 손상됐어요")
         case SheetConverter.ConversionError.unreadable:
             String(localized: "표 파일이 아니거나 손상됐어요")
+        case SheetConverter.ConversionError.passwordProtected:
+            String(localized: "암호가 걸린 엑셀 파일은 바꿀 수 없어요")
         case SheetConverter.ConversionError.empty:
             String(localized: "시트가 비어 있어서 바꿀 게 없어요")
         case SheetConverter.ConversionError.tooLarge:

@@ -17,11 +17,25 @@ struct CSVTable: Equatable {
         guard let data = try? Data(contentsOf: url) else {
             throw ReadError.unreadable
         }
-        let text = Self.decode(data)
+        var text = Self.decode(data)
+        // Excel's "sep=;" first line.
+        if let hint = Self.separatorHint(in: text) {
+            text = String(text.drop { !$0.isNewline }.dropFirst())
+            rows = Self.parse(text, separator: hint)
+            return
+        }
         rows = Self.parse(
             text,
             separator: Self.separator(in: text)
         )
+    }
+
+    private static func separatorHint(in text: String) -> Character? {
+        let first = text.prefix { !$0.isNewline }
+        guard first.count == 5, first.lowercased().hasPrefix("sep="), let separator = first.last else {
+            return nil
+        }
+        return separator
     }
 
     /// UTF-8 with a BOM and CRLF line ends, fields quoted only where they must be.
@@ -54,6 +68,8 @@ struct CSVTable: Equatable {
         var candidates: [String.Encoding] = [.utf8, windowsKorean, .windowsCP1252]
         if data.starts(with: [0xFF, 0xFE]) || data.starts(with: [0xFE, 0xFF]) {
             candidates.insert(.utf16, at: 0)
+        } else if let encoding = utf16WithoutBOM(data) {
+            candidates.insert(encoding, at: 0)
         }
         for encoding in candidates {
             if let text = String(data: data, encoding: encoding) {
@@ -64,6 +80,25 @@ struct CSVTable: Equatable {
             decoding: data,
             as: UTF8.self
         )
+    }
+
+    /// UTF-16 without a byte order mark, told by the zero bytes padding its ASCII.
+    private static func utf16WithoutBOM(_ data: Data) -> String.Encoding? {
+        let sample = data.prefix(4096)
+        guard sample.count >= 4, sample.count % 2 == 0 else {
+            return nil
+        }
+        let pairs = sample.count / 2
+        let start = sample.startIndex
+        let evenZeros = stride(from: 0, to: sample.count, by: 2).filter { sample[start + $0] == 0 }.count
+        let oddZeros = stride(from: 1, to: sample.count, by: 2).filter { sample[start + $0] == 0 }.count
+        if oddZeros * 2 > pairs, evenZeros * 10 < pairs {
+            return .utf16LittleEndian
+        }
+        if evenZeros * 2 > pairs, oddZeros * 10 < pairs {
+            return .utf16BigEndian
+        }
+        return nil
     }
 
     /// The separator that splits the first lines most evenly: comma, tab or semicolon.
