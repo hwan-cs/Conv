@@ -50,6 +50,19 @@ import Testing
         #expect((0..<3).map { combined.page(at: $0)?.bounds(for: .mediaBox).width } == [100, 200, 300])
     }
 
+    @Test func combiningSaysWhichInputFailed() throws {
+        let good = try writePDF(named: "good.pdf", pages: [CGSize(width: 100, height: 100)])
+        let bad = directory.appending(path: "bad.pdf")
+        try Data("not a pdf".utf8).write(to: bad)
+        do {
+            try PDFCombiner().combine([good, bad], to: directory.appending(path: "combined.pdf"))
+            Issue.record("expected the second input to fail")
+        } catch PDFCombiner.InputError.failed(let index, let error) {
+            #expect(index == 1)
+            #expect(error == .unreadable)
+        }
+    }
+
     @Test func somethingElseIsUnreadable() throws {
         let input = directory.appending(path: "fake.pdf")
         try Data("not a pdf".utf8).write(to: input)

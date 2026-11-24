@@ -133,7 +133,11 @@ extension ConversionServiceImpl {
                     case _ where Formats.imageInputs.contains(ext):
                         // An image becomes its own pages first, as it does alone.
                         let pdf = work.appending(path: "input-\(index).pdf")
-                        try ImageConverter().convert(source, to: pdf)
+                        do {
+                            try ImageConverter().convert(source, to: pdf)
+                        } catch {
+                            return reply(nil, "\((name as NSString).lastPathComponent): \(Self.message(for: error))")
+                        }
                         pdfs.append(pdf)
                     default:
                         return reply(nil, String(localized: "\(ext.uppercased()) 파일은 PDF에 합칠 수 없어요"))
@@ -141,7 +145,11 @@ extension ConversionServiceImpl {
                     progress(Double(index + 1) / Double(names.count) * 0.5)
                 }
                 let output = work.appending(path: "output.pdf")
-                try PDFCombiner().combine(pdfs, to: output) { progress(0.5 + $0 * 0.5) }
+                do {
+                    try PDFCombiner().combine(pdfs, to: output) { progress(0.5 + $0 * 0.5) }
+                } catch PDFCombiner.InputError.failed(let index, let error) where names.indices.contains(index) {
+                    return reply(nil, "\((names[index] as NSString).lastPathComponent): \(Self.message(for: error))")
+                }
                 reply(try FileHandle(forReadingFrom: output), nil)
             } catch {
                 reply(nil, Self.message(for: error))

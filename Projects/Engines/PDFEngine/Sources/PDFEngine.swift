@@ -107,6 +107,10 @@ public struct PDFPageRenderer: Sendable {
 
 /// PDFs one after another in a single PDF, with their links and annotations.
 public struct PDFCombiner: Sendable {
+    public enum InputError: Error {
+        case failed(index: Int, PDFEngine.ConversionError)
+    }
+
     public init() {}
 
     public func combine(_ inputs: [URL], to output: URL, progress: (Double) -> Void = { _ in }) throws {
@@ -114,10 +118,10 @@ public struct PDFCombiner: Sendable {
         var sources: [PDFDocument] = []
         for (index, input) in inputs.enumerated() {
             guard let document = PDFDocument(url: input) else {
-                throw PDFEngine.ConversionError.unreadable
+                throw InputError.failed(index: index, .unreadable)
             }
             if document.isLocked, !document.unlock(withPassword: "") {
-                throw PDFEngine.ConversionError.passwordProtected
+                throw InputError.failed(index: index, .passwordProtected)
             }
             sources.append(document)
             for number in 0..<document.pageCount {
