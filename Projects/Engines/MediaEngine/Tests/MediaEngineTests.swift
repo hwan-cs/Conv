@@ -22,6 +22,17 @@ import Testing
         #expect(abs(duration - 2) < 0.1, "\(output) lasts \(duration)s")
     }
 
+    @Test(arguments: [("mp3", 2), ("wav", 6), ("aiff", 6)])
+    func surroundAudioConverts(output: String, channels: Int) async throws {
+        let input = try writeMultichannelWAV(channels: 6, named: "surround.wav")
+        let converted = directory.appending(path: "surround.\(output)")
+        try await MediaConverter().convert(input, to: converted)
+        let track = try #require(try await AVURLAsset(url: converted).loadTracks(withMediaType: .audio).first)
+        let description = try #require(try await track.load(.formatDescriptions).first)
+        let stream = try #require(CMAudioFormatDescriptionGetStreamBasicDescription(description)?.pointee)
+        #expect(Int(stream.mChannelsPerFrame) == channels)
+    }
+
     @Test func mp3IsVariableBitRateWithAHeader() async throws {
         let input = try writeTone(seconds: 3, channels: 1, named: "mono.wav")
         let output = directory.appending(path: "mono.mp3")
@@ -44,6 +55,15 @@ import Testing
         let original = try await AVURLAsset(url: input).load(.duration).seconds
         let rewrapped = try await asset.load(.duration).seconds
         #expect(abs(rewrapped - original) < 0.05, "\(rewrapped)s from \(original)s")
+    }
+
+    @Test func mp4OfMotionJPEGIsReencodedToH264() async throws {
+        let input = try await writeVideo(named: "photo-jpeg.mov", codec: .jpeg)
+        let output = directory.appending(path: "photo-jpeg.mp4")
+        try await MediaConverter().convert(input, to: output)
+        let track = try #require(try await AVURLAsset(url: output).loadTracks(withMediaType: .video).first)
+        let description = try #require(try await track.load(.formatDescriptions).first)
+        #expect(CMFormatDescriptionGetMediaSubType(description) == kCMVideoCodecType_H264)
     }
 
     @Test func videoBecomesALoopingGIF() async throws {
@@ -98,12 +118,34 @@ import Testing
         return url
     }
 
-    /// One second of 64×48 H.264 at 10 frames a second, without sound.
-    func writeVideo(named name: String) async throws -> URL {
+    /// One second of 16-bit PCM WAV, written by hand: past stereo, AVAudioFormat needs a channel layout.
+    func writeMultichannelWAV(channels: Int, named name: String) throws -> URL {
+        let rate = 48_000
+        var samples = Data()
+        for frame in 0..<rate {
+            for channel in 0..<channels {
+                let value = Int16(sin(2 * .pi * Double(220 + 110 * channel) * Double(frame) / Double(rate)) * 8_000)
+                withUnsafeBytes(of: value.littleEndian) { samples.append(contentsOf: $0) }
+            }
+        }
+        func le<T: FixedWidthInteger>(_ value: T) -> Data {
+            withUnsafeBytes(of: value.littleEndian) { Data($0) }
+        }
+        var wav = Data("RIFF".utf8) + le(UInt32(36 + samples.count)) + Data("WAVEfmt ".utf8)
+        wav += le(UInt32(16)) + le(UInt16(1)) + le(UInt16(channels)) + le(UInt32(rate))
+        wav += le(UInt32(rate * channels * 2)) + le(UInt16(channels * 2)) + le(UInt16(16))
+        wav += Data("data".utf8) + le(UInt32(samples.count)) + samples
+        let url = directory.appending(path: name)
+        try wav.write(to: url)
+        return url
+    }
+
+    /// One second of 64×48 video at 10 frames a second, without sound.
+    func writeVideo(named name: String, codec: AVVideoCodecType = .h264) async throws -> URL {
         let url = directory.appending(path: name)
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 64, AVVideoHeightKey: 48,
+            AVVideoCodecKey: codec, AVVideoWidthKey: 64, AVVideoHeightKey: 48,
         ])
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA, kCVPixelBufferWidthKey as String: 64,

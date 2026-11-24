@@ -28,7 +28,8 @@ struct MP3Encoder {
         }
         var buffer = [UInt8]()
 
-        try await PCMReader.read(asset, progress: progress) { format in
+        // MP3 is at most stereo: surround is mixed down, not cut.
+        try await PCMReader.read(asset, channels: 2, progress: progress) { format in
             guard let encoder = lame_init() else {
                 throw EncodingError.setupFailed
             }

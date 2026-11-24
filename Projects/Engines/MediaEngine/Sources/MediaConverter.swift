@@ -6,6 +6,8 @@ public struct MediaConverter: Sendable {
     public enum ConversionError: Error, Equatable {
         case unreadable
         case noAudio
+        /// The video's codec is one macOS no longer decodes, such as QuickTime's Animation.
+        case undecodable
         case unsupportedOutput(String)
         case exportFailed(String)
     }
@@ -43,7 +45,9 @@ public struct MediaConverter: Sendable {
     }
 
     private func exportVideo(_ asset: AVURLAsset, to output: URL, as type: AVFileType, progress: @escaping @Sendable (Double) -> Void) async throws {
-        if await AVAssetExportSession.compatibility(ofExportPreset: AVAssetExportPresetPassthrough, with: asset, outputFileType: type) {
+        let playsAnywhere = try await Self.playsAnywhere(asset)
+        let rewraps = type == .mov || playsAnywhere
+        if rewraps, await AVAssetExportSession.compatibility(ofExportPreset: AVAssetExportPresetPassthrough, with: asset, outputFileType: type) {
             do {
                 try await export(asset, preset: AVAssetExportPresetPassthrough, to: output, as: type, progress: progress)
                 return
@@ -51,7 +55,47 @@ public struct MediaConverter: Sendable {
                 try? FileManager.default.removeItem(at: output)
             }
         }
+        try await Self.requireDecodableVideo(asset)
         try await export(asset, preset: AVAssetExportPresetHighestQuality, to: output, as: type, progress: progress)
+    }
+
+    /// Codecs an MP4 plays almost anywhere; others, such as Motion JPEG or ProRes, are re-encoded.
+    private static func playsAnywhere(_ asset: AVAsset) async throws -> Bool {
+        let video: Set<FourCharCode> = [
+            kCMVideoCodecType_H264,
+            kCMVideoCodecType_HEVC,
+            kCMVideoCodecType_MPEG4Video,
+            FourCharCode(0x6865_7631), // hev1
+        ]
+        let audio: Set<FourCharCode> = [
+            kAudioFormatMPEG4AAC,
+            kAudioFormatMPEG4AAC_HE,
+            kAudioFormatMPEG4AAC_HE_V2,
+            kAudioFormatMPEGLayer3,
+            kAudioFormatAC3,
+            kAudioFormatEnhancedAC3,
+        ]
+        for track in try await asset.load(.tracks) {
+            let allowed: Set<FourCharCode>
+            switch track.mediaType {
+            case .video:
+                allowed = video
+            case .audio:
+                allowed = audio
+            default:
+                continue
+            }
+            for description in try await track.load(.formatDescriptions) where !allowed.contains(CMFormatDescriptionGetMediaSubType(description)) {
+                return false
+            }
+        }
+        return true
+    }
+
+    static func requireDecodableVideo(_ asset: AVAsset) async throws {
+        for track in try await asset.loadTracks(withMediaType: .video) where try await !track.load(.isDecodable) {
+            throw ConversionError.undecodable
+        }
     }
 
     private func export(
@@ -89,7 +133,7 @@ public struct MediaConverter: Sendable {
     /// Decodes the first audio track to 16-bit PCM in WAV or AIFF, at its own rate and channels.
     private func writePCM(_ asset: AVAsset, to output: URL, bigEndian: Bool, progress: @escaping @Sendable (Double) -> Void) async throws {
         try await PCMReader.read(asset, progress: progress) { format in
-            let settings: [String: Any] = [
+            var settings: [String: Any] = [
                 AVFormatIDKey: kAudioFormatLinearPCM,
                 AVSampleRateKey: format.sampleRate,
                 AVNumberOfChannelsKey: format.channelCount,
@@ -97,6 +141,9 @@ public struct MediaConverter: Sendable {
                 AVLinearPCMIsFloatKey: false,
                 AVLinearPCMIsBigEndianKey: bigEndian,
             ]
+            if let layout = format.channelLayout {
+                settings[AVChannelLayoutKey] = PCMReader.data(of: layout)
+            }
             let file = try AVAudioFile(forWriting: output, settings: settings, commonFormat: .pcmFormatFloat32, interleaved: false)
             return { buffer in try file.write(from: buffer) }
         }
@@ -105,9 +152,12 @@ public struct MediaConverter: Sendable {
 
 /// Decodes an asset's first audio track into float PCM buffers.
 enum PCMReader {
-    /// - Parameter makeSink: Called once with the decoded format; returns what receives each buffer.
+    /// - Parameters:
+    ///   - channels: The most channels to keep; more are mixed down.
+    ///   - makeSink: Called once with the decoded format; returns what receives each buffer.
     static func read(
         _ asset: AVAsset,
+        channels limit: AVAudioChannelCount = 8,
         progress: @Sendable (Double) -> Void = { _ in },
         makeSink: (AVAudioFormat) throws -> (AVAudioPCMBuffer) throws -> Void
     ) async throws {
@@ -119,13 +169,17 @@ enum PCMReader {
         guard let stream = descriptions.first.flatMap({ CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee }) else {
             throw MediaConverter.ConversionError.unreadable
         }
-        let channels = AVAudioChannelCount(max(min(stream.mChannelsPerFrame, 8), 1))
-        guard let format = AVAudioFormat(standardFormatWithSampleRate: stream.mSampleRate, channels: channels) else {
+        let channels = AVAudioChannelCount(max(min(stream.mChannelsPerFrame, limit), 1))
+        // Past stereo, a format needs a channel layout.
+        let layout = channels > 2 ? AVAudioChannelLayout(layoutTag: kAudioChannelLayoutTag_DiscreteInOrder | channels) : nil
+        let made = layout.map { AVAudioFormat(standardFormatWithSampleRate: stream.mSampleRate, channelLayout: $0) }
+            ?? AVAudioFormat(standardFormatWithSampleRate: stream.mSampleRate, channels: channels)
+        guard let format = made else {
             throw MediaConverter.ConversionError.unreadable
         }
 
         let reader = try AVAssetReader(asset: asset)
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+        var settings: [String: Any] = [
             AVFormatIDKey: kAudioFormatLinearPCM,
             AVLinearPCMBitDepthKey: 32,
             AVLinearPCMIsFloatKey: true,
@@ -133,7 +187,11 @@ enum PCMReader {
             AVLinearPCMIsBigEndianKey: false,
             AVSampleRateKey: format.sampleRate,
             AVNumberOfChannelsKey: format.channelCount,
-        ])
+        ]
+        if let layout {
+            settings[AVChannelLayoutKey] = data(of: layout)
+        }
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: settings)
         reader.add(output)
         guard reader.startReading() else {
             throw MediaConverter.ConversionError.unreadable
@@ -159,6 +217,12 @@ enum PCMReader {
         if reader.status == .failed {
             throw MediaConverter.ConversionError.exportFailed(reader.error?.localizedDescription ?? "")
         }
+    }
+
+    static func data(of layout: AVAudioChannelLayout) -> Data {
+        let size = MemoryLayout<AudioChannelLayout>.size
+            + max(Int(layout.layout.pointee.mNumberChannelDescriptions) - 1, 0) * MemoryLayout<AudioChannelDescription>.size
+        return Data(bytes: layout.layout, count: size)
     }
 }
 

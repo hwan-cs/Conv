@@ -220,6 +220,8 @@ extension ConversionServiceImpl {
             String(localized: "영상이나 소리를 읽을 수 없어요")
         case MediaConverter.ConversionError.noAudio:
             String(localized: "소리가 없는 파일이에요")
+        case MediaConverter.ConversionError.undecodable:
+            String(localized: "이 영상의 코덱은 Mac에서 열 수 없어요")
         case MediaConverter.ConversionError.exportFailed(let reason):
             String(localized: "변환하지 못했어요 (\(reason))")
         default:

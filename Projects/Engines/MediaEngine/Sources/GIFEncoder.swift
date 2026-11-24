@@ -15,6 +15,7 @@ struct GIFEncoder {
         guard try await !asset.loadTracks(withMediaType: .video).isEmpty else {
             throw MediaConverter.ConversionError.unreadable
         }
+        try await MediaConverter.requireDecodableVideo(asset)
         let duration = try await asset.load(.duration).seconds
         guard duration.isFinite, duration > 0 else {
             throw MediaConverter.ConversionError.unreadable
@@ -45,7 +46,11 @@ struct GIFEncoder {
             added += 1
             progress(Double(added) / Double(count))
         }
-        guard added > 0, CGImageDestinationFinalize(destination) else {
+        // No frame decoded, as for a video too small for the decoder.
+        guard added > 0 else {
+            throw MediaConverter.ConversionError.undecodable
+        }
+        guard CGImageDestinationFinalize(destination) else {
             throw MediaConverter.ConversionError.exportFailed("GIF")
         }
     }
