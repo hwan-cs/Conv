@@ -510,6 +510,39 @@ extension HwpEquationTests {
         #expect(last.bounds(for: page).minX > page.bounds(for: .mediaBox).width / 2)
     }
 
+    @Test func tableCaptionsAreWrittenAboveAndBelow() throws {
+        var document = document()
+        guard case .control(.table(var table)) = document.sections[0].paragraphs[1].content[2] else {
+            Issue.record("the sample's table moved")
+            return
+        }
+        let text = { (words: String) in [HwpDocument.Paragraph(content: [.text(words, charShapeID: 0)])] }
+        table.layout.caption = HwpDocument.Caption(side: .top, gap: 850, paragraphs: text("표 1 위 캡션"))
+        var below = table
+        below.layout.caption = HwpDocument.Caption(side: .bottom, gap: 850, paragraphs: text("표 2 아래 캡션"))
+        document.sections[0].paragraphs[1].content = [.control(.table(table))]
+        document.sections[0].paragraphs.append(HwpDocument.Paragraph(content: [.control(.table(below))]))
+
+        let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).docx")
+        defer {
+            try? FileManager.default.removeItem(at: url)
+        }
+        var docx = HwpDocxWriter(document: document)
+        try docx.write(to: url)
+        let body = try part("word/document.xml", of: url)
+        let first = try #require(body.range(of: "표 1 위 캡션")?.lowerBound)
+        let second = try #require(body.range(of: "표 2 아래 캡션")?.lowerBound)
+        let tables = body.ranges(of: "<w:tbl>").map(\.lowerBound)
+        #expect(tables.count == 2)
+        #expect(first < tables[0] && tables[1] < second)
+
+        var html = HwpHTMLWriter(document: document)
+        let page = html.sections().map(\.html).joined()
+        // Digits get a span of their own.
+        #expect(page.contains("caption-side:top") && page.contains("위 캡션"))
+        #expect(page.contains("caption-side:bottom") && page.contains("아래 캡션"))
+    }
+
     @Test func equationsBecomeOfficeMath() throws {
         let omml = HwpOfficeMath.omml(HwpEquation.mathML("{a} over {b} + sqrt {x}"), size: 1000)
         #expect(omml.hasPrefix("<m:oMath>"))

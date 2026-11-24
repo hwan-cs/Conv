@@ -363,24 +363,50 @@ struct HwpDocxWriter {
                         flush(&self, force: false)
                     }
                     if !sideBySide {
+                        blocks += captionBlocks(table.layout, above: true)
                         blocks.append(self.table(table))
+                        blocks += captionBlocks(table.layout, above: false)
                     } else if !placedSideBySide {
                         blocks.append(layoutTable(tables))
                         placedSideBySide = true
                     }
                 case .picture(let picture):
+                    if picture.layout.caption.map(Self.isAbove) == true {
+                        flush(&self, force: false)
+                        blocks += captionBlocks(picture.layout, above: true)
+                    }
                     breakBefore(picture.layout)
                     if let drawing = drawing(picture) {
                         runs += "<w:r>\(drawing)</w:r>"
                     }
                     hasObject = true
+                    if picture.layout.caption.map(Self.isAbove) == false {
+                        flush(&self, force: false)
+                        blocks += captionBlocks(picture.layout, above: false)
+                    }
                 case .shape(let shape):
+                    if shape.layout.caption.map(Self.isAbove) == true {
+                        flush(&self, force: false)
+                        blocks += captionBlocks(shape.layout, above: true)
+                    }
                     breakBefore(shape.layout)
                     runs += "<w:r>\(drawing(shape))</w:r>"
                     hasObject = true
+                    if shape.layout.caption.map(Self.isAbove) == false {
+                        flush(&self, force: false)
+                        blocks += captionBlocks(shape.layout, above: false)
+                    }
                 case .equation(let equation):
+                    if equation.layout.caption.map(Self.isAbove) == true {
+                        flush(&self, force: false)
+                        blocks += captionBlocks(equation.layout, above: true)
+                    }
                     runs += HwpOfficeMath.omml(HwpEquation.mathML(equation.script), size: equation.fontSize)
                     hasObject = true
+                    if equation.layout.caption.map(Self.isAbove) == false {
+                        flush(&self, force: false)
+                        blocks += captionBlocks(equation.layout, above: false)
+                    }
                 case .footnote(let paragraphs):
                     runs += note(paragraphs, kind: "footnote", shapeID: paragraph.charShapeID)
                 case .endnote(let paragraphs):
@@ -406,6 +432,18 @@ struct HwpDocxWriter {
         }
         flush(&self, force: blocks.isEmpty || hasText)
         return blocks
+    }
+
+    /// Word has no object captions, so they become paragraphs around the object.
+    private static func isAbove(_ caption: HwpDocument.Caption) -> Bool {
+        caption.side == .top || caption.side == .left
+    }
+
+    private mutating func captionBlocks(_ layout: HwpDocument.ObjectLayout, above: Bool) -> [String] {
+        guard let caption = layout.caption, Self.isAbove(caption) == above else {
+            return []
+        }
+        return caption.paragraphs.flatMap { blocks($0) }
     }
 
     private func paragraphProperties(_ shape: HwpDocument.ParaShape, paragraph: HwpDocument.Paragraph, hasObject: Bool) -> String {

@@ -431,7 +431,8 @@ struct HwpxReader {
 
     /// Tables, pictures, drawings and equations: everything placed with 개체 공통 속성.
     private func object(_ element: XMLElement) -> HwpDocument.Control? {
-        let layout = Self.objectLayout(element)
+        var layout = Self.objectLayout(element)
+        layout.caption = caption(of: element)
         switch element.localName {
         case "tbl":
             var table = HwpDocument.Table()
@@ -567,6 +568,27 @@ struct HwpxReader {
         return shape
     }
 
+    private func caption(of element: XMLElement) -> HwpDocument.Caption? {
+        guard let caption = element.child(named: "caption") else {
+            return nil
+        }
+        let side: HwpDocument.Caption.Side = switch caption.string("side") {
+        case "LEFT":
+            .left
+        case "RIGHT":
+            .right
+        case "TOP":
+            .top
+        default: .bottom
+        }
+        return HwpDocument.Caption(
+            side: side,
+            width: caption.int("width"),
+            gap: caption.int("gap"),
+            paragraphs: paragraphs(in: caption.child(named: "subList"))
+        )
+    }
+
     private static func objectLayout(_ element: XMLElement) -> HwpDocument.ObjectLayout {
         var layout = HwpDocument.ObjectLayout()
         if let size = element.child(named: "sz") {
@@ -672,7 +694,7 @@ struct HwpxReader {
         guard let data = try Self.data(in: archive, at: path) else {
             return nil
         }
-        return try XMLDocument(data: Self.protectingBlankText(data)).rootElement()
+        return try PackageXML.root(Self.protectingBlankText(data))
     }
 
     /// libxml2 drops whitespace-only text nodes whatever the options, and Hangul writes the spaces

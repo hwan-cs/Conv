@@ -1004,7 +1004,14 @@ struct HwpHTMLWriter {
             style += "margin-bottom:\(decimal(pt(margins.bottom + objectGap / 2)))pt;"
         }
 
-        var html = "<table style=\"\(style)\"><colgroup>"
+        var html = "<table style=\"\(style)\">"
+        if let caption = table.layout.caption {
+            // CSS has only top and bottom table captions.
+            let top = caption.side == .top || caption.side == .left
+            let padding = "padding-\(top ? "bottom" : "top"):\(decimal(pt(caption.gap)))pt;"
+            html += "<caption style=\"caption-side:\(top ? "top" : "bottom");\(padding)text-align:left;text-indent:0;\">\(list(caption.paragraphs))</caption>"
+        }
+        html += "<colgroup>"
         html += widths.map { "<col style=\"width:\(decimal(pt($0)))pt\">" }.joined()
         html += "</colgroup>"
         let rows = Dictionary(grouping: table.cells, by: \.row)
@@ -1144,10 +1151,46 @@ struct HwpHTMLWriter {
             let imageStyle = "position:absolute;max-width:none;left:\(decimal(pt(frame.x)))pt;top:\(decimal(pt(frame.y)))pt;width:\(decimal(pt(frame.width)))pt;height:\(decimal(pt(frame.height)))pt;"
             image = "<span style=\"display:block;position:relative;overflow:hidden;\(style)\"><img src=\"\(source)\" style=\"\(imageStyle)\"></span>"
         }
+        image = captioned(image, layout: picture.layout)
         if picture.layout.inline {
             return "<span style=\"display:inline-block;vertical-align:bottom;\(objectGapMargins)\">\(image)</span>"
         }
         return floating(image, layout: picture.layout)
+    }
+
+    /// Inline, the caption takes room in the line; on a placed object it hangs outside so the object stays put.
+    private mutating func captioned(_ object: String, layout: HwpDocument.ObjectLayout) -> String {
+        guard let caption = layout.caption else {
+            return object
+        }
+        let gap = decimal(pt(caption.gap))
+        let text = list(caption.paragraphs)
+        let width = "width:\(decimal(pt(caption.width)))pt;"
+        let objectWidth = "width:\(decimal(pt(layout.width)))pt;"
+        if layout.inline {
+            let style = "display:block;text-indent:0;text-align:left;"
+            return switch caption.side {
+            case .top:
+                "<span style=\"display:block;\(objectWidth)\"><span style=\"\(style)margin-bottom:\(gap)pt;\">\(text)</span>\(object)</span>"
+            case .bottom:
+                "<span style=\"display:block;\(objectWidth)\">\(object)<span style=\"\(style)margin-top:\(gap)pt;\">\(text)</span></span>"
+            case .left:
+                "<span style=\"display:inline-flex;align-items:flex-start;\"><span style=\"\(style)\(width)margin-right:\(gap)pt;\">\(text)</span>\(object)</span>"
+            case .right:
+                "<span style=\"display:inline-flex;align-items:flex-start;\">\(object)<span style=\"\(style)\(width)margin-left:\(gap)pt;\">\(text)</span></span>"
+            }
+        }
+        let hanging = switch caption.side {
+        case .top:
+            "left:0;\(objectWidth)bottom:100%;margin-bottom:\(gap)pt;"
+        case .bottom:
+            "left:0;\(objectWidth)top:100%;margin-top:\(gap)pt;"
+        case .left:
+            "top:0;\(width)right:100%;margin-right:\(gap)pt;"
+        case .right:
+            "top:0;\(width)left:100%;margin-left:\(gap)pt;"
+        }
+        return "<span style=\"display:block;position:relative;\">\(object)<span style=\"position:absolute;\(hanging)text-indent:0;text-align:left;line-height:normal;\">\(text)</span></span>"
     }
 
     /// Where the whole image goes, in HWPUNIT relative to the picture's box, when only part of it shows; nil when it shows whole.
@@ -1382,6 +1425,7 @@ struct HwpHTMLWriter {
             }.joined()
             inner = "<div style=\"\(style)\">\(text)</div>\(children)"
         }
+        inner = captioned(inner, layout: shape.layout)
         if shape.layout.inline {
             return "<span style=\"display:inline-block;position:relative;vertical-align:bottom;text-indent:0;\(objectGapMargins)\">\(inner)</span>"
         }
@@ -1389,11 +1433,17 @@ struct HwpHTMLWriter {
     }
 
     /// An equation as MathML, in a box of Hangul's width so the text after it stays where Hangul put it.
-    private func equation(_ equation: HwpDocument.Equation) -> String {
+    private mutating func equation(_ equation: HwpDocument.Equation) -> String {
         let size = decimal(pt(equation.fontSize))
         let color = equation.color == .black ? "" : "color:\(equation.color.css);"
         let width = equation.layout.width > 0 ? "width:\(decimal(pt(equation.layout.width)))pt;" : ""
-        return "<span class=\"equation\" style=\"display:inline-block;\(width)text-indent:0;white-space:nowrap;font-size:\(size)pt;line-height:normal;\(color)\">\(HwpEquation.mathML(equation.script))</span>"
+        let math = "<span class=\"equation\" style=\"display:inline-block;\(width)text-indent:0;white-space:nowrap;font-size:\(size)pt;line-height:normal;\(color)\">\(HwpEquation.mathML(equation.script))</span>"
+        guard equation.layout.caption != nil else {
+            return math
+        }
+        var layout = equation.layout
+        layout.inline = true
+        return "<span style=\"display:inline-block;vertical-align:bottom;\">\(captioned(math, layout: layout))</span>"
     }
 
     // MARK: HTML

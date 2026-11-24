@@ -319,6 +319,18 @@ struct HwpDocument {
         var wrap: Wrap = .topAndBottom
         var zOrder = 0
         var margins: (left: Int, right: Int, top: Int, bottom: Int) = (0, 0, 0, 0)
+        var caption: Caption?
+    }
+
+    /// 캡션, outside the object's size.
+    struct Caption {
+        enum Side {
+            case left, right, top, bottom
+        }
+        var side: Side = .bottom
+        var width = 0
+        var gap = 0
+        var paragraphs: [Paragraph] = []
     }
 
     struct Table {

@@ -487,7 +487,9 @@ struct HwpBinaryReader {
         case "tbl ":
             return table(node).map { .table($0) }
         case "gso ":
-            return shapeObject(node, layout: Self.objectLayout(payload))
+            var layout = Self.objectLayout(payload)
+            layout.caption = caption(in: node.children, before: HwpTag.shapeComponent)
+            return shapeObject(node, layout: layout)
         case "eqed":
             guard let record = node.children.first(where: { $0.record.tag == HwpTag.eqEdit }) else {
                 return nil
@@ -497,8 +499,10 @@ struct HwpBinaryReader {
             let script = reader.string()
             let size = Int(reader.uint32())
             let color = reader.uint32()
+            var layout = Self.objectLayout(payload)
+            layout.caption = caption(in: node.children, before: HwpTag.eqEdit)
             return .equation(.init(
-                layout: Self.objectLayout(payload),
+                layout: layout,
                 script: script,
                 fontSize: size,
                 color: HwpDocument.Color(colorRef: color) ?? .black
@@ -589,13 +593,35 @@ struct HwpBinaryReader {
         return layout
     }
 
+    /// A caption's list comes before the object's own record.
+    private func caption(in children: [RecordNode], before tag: Int) -> HwpDocument.Caption? {
+        let end = children.firstIndex { $0.record.tag == tag } ?? children.endIndex
+        guard let index = children[..<end].firstIndex(where: { $0.record.tag == HwpTag.listHeader }) else {
+            return nil
+        }
+        let header = children[index].record.payload
+        guard header.count >= 18 else {
+            return nil
+        }
+        let sides: [HwpDocument.Caption.Side] = [.left, .right, .top, .bottom]
+        let count = Int(header.uint16(at: 0))
+        return HwpDocument.Caption(
+            side: sides[Int(header.uint32(at: 8) & 3)],
+            width: Int(header.uint32(at: 12)),
+            gap: Int(header.uint16(at: 16)),
+            paragraphs: paragraphs(in: children[(index + 1)..<end].prefix { $0.record.tag == HwpTag.paraHeader }.prefix(count))
+        )
+    }
+
     private func table(_ node: RecordNode) -> HwpDocument.Table? {
         var table = HwpDocument.Table()
         table.layout = Self.objectLayout(node.record.payload)
         let children = node.children
-        guard let record = children.first(where: { $0.record.tag == HwpTag.table }) else {
+        guard let recordIndex = children.firstIndex(where: { $0.record.tag == HwpTag.table }) else {
             return nil
         }
+        let record = children[recordIndex]
+        table.layout.caption = caption(in: children, before: HwpTag.table)
         var reader = ByteReader(record.record.payload)
         let flags = reader.uint32()
         table.repeatHeader = flags & 4 != 0
@@ -606,7 +632,7 @@ struct HwpBinaryReader {
         reader.skip(table.rows * 2)
         table.borderFillID = Int(reader.uint16())
 
-        var index = children.startIndex
+        var index = recordIndex + 1
         while index < children.endIndex {
             defer {
                 index += 1
@@ -657,6 +683,8 @@ struct HwpBinaryReader {
         var layout = layout
         var corner = (x: 0, y: 0)
         if !topLevel {
+            // A caption belongs to the group, not its parts.
+            layout.caption = nil
             let size = (width: Double(payload.uint32(at: base + 12)), height: Double(payload.uint32(at: base + 16)))
             var transform = CGAffineTransform.identity
             for index in (0..<matrixCount).reversed() {
