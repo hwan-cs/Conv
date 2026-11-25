@@ -5,7 +5,7 @@ let appBundleID = "\(Conv.bundleIDPrefix).Conv"
 /// Embedded bundles must carry the same version as the app.
 let version: [String: Plist.Value] = [
     "CFBundleShortVersionString": "1.0.0",
-    "CFBundleVersion": "2",
+    "CFBundleVersion": "3",
 ]
 let localizable: ResourceFileElement = "Localization/Localizable.xcstrings"
 
@@ -18,6 +18,7 @@ let sandbox: Entitlements = .dictionary([
 
 let documentTypes: Plist.Value = [
     [
+        "CFBundleTypeName": "Convertible File",
         "CFBundleTypeRole": "Viewer",
         "LSHandlerRank": "None",
         "LSItemContentTypes": [
@@ -30,6 +31,7 @@ let documentTypes: Plist.Value = [
         "CFBundleTypeExtensions": ["hwp", "hwpx"],
     ],
     [
+        "CFBundleTypeName": "Converted File",
         "CFBundleTypeRole": "Editor",
         "LSHandlerRank": "None",
         "LSItemContentTypes": [
@@ -110,6 +112,7 @@ let finderSync = Target.target(
     deploymentTargets: Conv.deploymentTargets,
     infoPlist: .extendingDefault(with: version.merging([
         "CFBundleDisplayName": "Conv",
+        "LSUIElement": true,
         "NSExtension": [
             "NSExtensionPointIdentifier": "com.apple.FinderSync",
             "NSExtensionPrincipalClass": "$(PRODUCT_MODULE_NAME).FinderSync",
