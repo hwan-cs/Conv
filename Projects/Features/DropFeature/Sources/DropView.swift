@@ -382,12 +382,29 @@ private struct ConvertingScreen: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("\(model.items.count)개 바꾸는 중")
+                Text(model.isCancelled ? String(localized: "멈추는 중") : String(localized: "\(model.items.count)개 바꾸는 중"))
                     .font(ConvFont.sans(24, .heavy))
                     .tracking(-0.5)
                 Spacer()
                 Text("\(model.settledCount) / \(model.items.count)")
                     .font(ConvFont.mono(13, .bold))
+                Button {
+                    model.cancel()
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("취소")
+                        KeyHint("⎋")
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(ConvColor.white))
+                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(ConvColor.ink, lineWidth: 1.5))
+                    .foregroundStyle(ConvColor.ink)
+                }
+                .buttonStyle(.plain)
+                .font(ConvFont.sans(13, .semibold))
+                .keyboardShortcut(.cancelAction)
+                .disabled(model.isCancelled)
             }
             .foregroundStyle(ConvColor.ink)
             
@@ -470,6 +487,10 @@ private struct ConversionRow: View {
                 .foregroundStyle(ConvColor.errorText)
                 .lineLimit(2)
                 .multilineTextAlignment(.trailing)
+        case .cancelled:
+            Text("취소됨")
+                .font(ConvFont.sans(12))
+                .foregroundStyle(ConvColor.muted)
         }
     }
 }
@@ -478,6 +499,11 @@ private struct DoneScreen: View {
     let model: DropModel
     
     private var headline: String {
+        if model.isCancelled {
+            return model.finishedCount > 0
+                ? String(localized: "\(model.finishedCount)개 바꾸고 멈췄어요")
+                : String(localized: "취소했어요")
+        }
         guard model.finishedCount > 0 else {
             return String(localized: "바꾸지 못했어요")
         }

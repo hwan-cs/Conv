@@ -4,10 +4,13 @@ import Foundation
 public final class ConversionClient: @unchecked Sendable {
     public struct Failure: Error, Sendable, CustomStringConvertible {
         public let description: String
+        public var isCancelled = false
+        var isInterruption = false
     }
 
     private let connection: NSXPCConnection
     private let progress = ProgressRouter()
+    private let pending = PendingCalls()
 
     public init() {
         connection = NSXPCConnection(serviceName: ConversionService.serviceName)
@@ -32,8 +35,20 @@ public final class ConversionClient: @unchecked Sendable {
         defer {
             try? handle.close()
         }
-        return try await call(onProgress) { service, job, reply in
+        return try await call(onProgress, rewinding: [handle]) { service, job, reply in
             service.convert(handle, named: input.lastPathComponent, to: format, job: job, withReply: reply)
+        }
+    }
+
+    /// Ends this client's calls as cancelled and stops the service, which can't stop an engine midway.
+    public func cancel() {
+        let calls = pending.removeAll()
+        guard !calls.isEmpty else {
+            return
+        }
+        (connection.remoteObjectProxy as? ConversionServiceProtocol)?.cancelAll()
+        for cancel in calls {
+            cancel()
         }
     }
 
@@ -47,7 +62,7 @@ public final class ConversionClient: @unchecked Sendable {
         defer {
             try? handle.close()
         }
-        let packed = try await call(onProgress) { service, job, reply in
+        let packed = try await call(onProgress, rewinding: [handle]) { service, job, reply in
             service.convertPages(handle, named: input.lastPathComponent, to: format, job: job, withReply: reply)
         }
         return try PackedFiles.Reader(packed)
@@ -92,7 +107,7 @@ public final class ConversionClient: @unchecked Sendable {
         to format: String,
         onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> FileHandle {
-        try await call(onProgress) { service, job, reply in
+        try await call(onProgress, rewinding: handles) { service, job, reply in
             service.combine(
                 handles,
                 named: names,
@@ -103,7 +118,23 @@ public final class ConversionClient: @unchecked Sendable {
         }
     }
 
-    /// Sends one request, with progress routed to `onProgress`, and waits for its reply.
+    /// Sends one request and waits for its reply, retrying once if the service stops under it.
+    private func call(
+        _ onProgress: @escaping @Sendable (Double) -> Void,
+        rewinding handles: [FileHandle],
+        _ send: (ConversionServiceProtocol, String, @escaping @Sendable (FileHandle?, String?) -> Void) -> Void
+    ) async throws -> FileHandle {
+        do {
+            return try await call(onProgress, send)
+        } catch let failure as Failure where failure.isInterruption {
+            // The service shares the files' read position, so rewind before resending.
+            for handle in handles {
+                try handle.seek(toOffset: 0)
+            }
+            return try await call(onProgress, send)
+        }
+    }
+
     private func call(
         _ onProgress: @escaping @Sendable (Double) -> Void,
         _ send: (ConversionServiceProtocol, String, @escaping @Sendable (FileHandle?, String?) -> Void) -> Void
@@ -112,12 +143,22 @@ public final class ConversionClient: @unchecked Sendable {
         progress.register(job, onProgress)
         defer {
             progress.unregister(job)
+            pending.remove(job)
         }
         return try await withCheckedThrowingContinuation { continuation in
             let resumed = Once()
+            pending.add(job) {
+                if resumed.claim() {
+                    continuation.resume(throwing: Failure(description: String(localized: "취소했어요"), isCancelled: true))
+                }
+            }
             let service = connection.remoteObjectProxyWithErrorHandler { error in
                 if resumed.claim() {
-                    continuation.resume(throwing: Failure(description: String(localized: "변환 서비스가 멈췄어요: \(error.localizedDescription)")))
+                    let interrupted = (error as NSError).domain == NSCocoaErrorDomain && (error as NSError).code == NSXPCConnectionInterrupted
+                    continuation.resume(throwing: Failure(
+                        description: String(localized: "변환 서비스가 멈췄어요: \(error.localizedDescription)"),
+                        isInterruption: interrupted
+                    ))
                 }
             } as? ConversionServiceProtocol
             
@@ -157,6 +198,32 @@ private final class ProgressRouter: NSObject, ConversionProgressProtocol, @unche
     func report(job: String, fraction: Double) {
         let handler = lock.withLock { handlers[job] }
         handler?(min(max(fraction, 0), 1))
+    }
+}
+
+private final class PendingCalls: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancellers: [String: @Sendable () -> Void] = [:]
+
+    func add(_ job: String, _ cancel: @escaping @Sendable () -> Void) {
+        lock.withLock {
+            cancellers[job] = cancel
+        }
+    }
+
+    func remove(_ job: String) {
+        lock.withLock {
+            _ = cancellers.removeValue(forKey: job)
+        }
+    }
+
+    func removeAll() -> [@Sendable () -> Void] {
+        lock.withLock {
+            defer {
+                cancellers.removeAll()
+            }
+            return Array(cancellers.values)
+        }
     }
 }
 

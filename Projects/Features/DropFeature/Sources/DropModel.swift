@@ -23,6 +23,7 @@ public final class DropModel {
             case converting(Double?)
             case done(URL)
             case failed(String)
+            case cancelled
         }
 
         public let id = UUID()
@@ -46,6 +47,7 @@ public final class DropModel {
     public private(set) var notice: String?
     /// The notice is about Finder's menu needing a folder allowed in Settings.
     public private(set) var noticeNeedsFolderAccess = false
+    public private(set) var isCancelled = false
 
     private let client: ConversionClient
 
@@ -71,7 +73,7 @@ public final class DropModel {
             switch $0.status {
             case .waiting, .converting:
                 false
-            case .done, .failed:
+            case .done, .failed, .cancelled:
                 true
             }
         }.count
@@ -125,15 +127,26 @@ public final class DropModel {
 
     public func choose(_ output: Formats.Output) {
         self.output = output
+        isCancelled = false
         phase = .converting
         Task {
             await convertAll(to: output)
         }
     }
 
+    /// Stops the current file and skips the rest.
+    public func cancel() {
+        guard phase == .converting, !isCancelled else {
+            return
+        }
+        isCancelled = true
+        client.cancel()
+    }
+
     public func reset() {
         items = []
         output = nil
+        isCancelled = false
         notice = nil
         noticeNeedsFolderAccess = false
         phase = .empty
@@ -165,6 +178,10 @@ public final class DropModel {
             return
         }
         for index in items.indices {
+            guard !isCancelled else {
+                items[index].status = .cancelled
+                continue
+            }
             items[index].status = .converting(nil)
             items[index].status = await convert(items[index], to: output)
             if case .done(let written) = items[index].status {
@@ -209,7 +226,7 @@ public final class DropModel {
                 return chosen
             }
         } catch let error as ConversionClient.Failure {
-            status = .failed(error.description)
+            status = error.isCancelled ? .cancelled : .failed(error.description)
         } catch {
             status = .failed(String(localized: "파일을 읽을 수 없어요"))
         }
@@ -238,7 +255,7 @@ public final class DropModel {
                 }
             }
         } catch let error as ConversionClient.Failure {
-            return .failed(error.description)
+            return error.isCancelled ? .cancelled : .failed(error.description)
         } catch {
             return .failed(String(localized: "파일을 읽을 수 없어요"))
         }
@@ -294,7 +311,7 @@ public final class DropModel {
                 }
             }
         } catch let error as ConversionClient.Failure {
-            return .failed(error.description)
+            return error.isCancelled ? .cancelled : .failed(error.description)
         } catch {
             return .failed(String(localized: "파일을 읽을 수 없어요"))
         }

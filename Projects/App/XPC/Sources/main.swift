@@ -27,6 +27,10 @@ final class ConversionServiceImpl: NSObject, ConversionServiceProtocol, @uncheck
         reply("pong")
     }
 
+    func cancelAll() {
+        exit(0)
+    }
+
     func renderPDF(fromHTML html: String, withReply reply: @escaping @Sendable (Data?, String?) -> Void) {
         Task { @MainActor in
             let output = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).pdf")

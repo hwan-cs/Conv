@@ -27,6 +27,9 @@ import Foundation
         withReply reply: @escaping @Sendable (FileHandle?, String?) -> Void
     )
 
+    /// Stops every conversion by ending the service; launchd relaunches it on the next call.
+    func cancelAll()
+
     /// Makes each page of a PDF into an image of `format`. Replies with them as `PackedFiles`.
     func convertPages(
         _ input: FileHandle,
