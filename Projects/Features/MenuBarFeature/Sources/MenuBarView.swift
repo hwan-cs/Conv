@@ -150,7 +150,16 @@ struct MenuBarView: View {
             notice = String(localized: "클립보드에 이미지나 파일이 없어요.")
             return
         }
-        let stamp = Date.now.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false).dateTimeSeparator(.space).timeSeparator(.omitted))
+        // ISO 8601 defaults to UTC; the name uses local time.
+        let stamp = Date.now.formatted(
+            Date.ISO8601FormatStyle(timeZone: .current)
+                .year()
+                .month()
+                .day()
+                .time(includingFractionalSeconds: false)
+                .dateTimeSeparator(.space)
+                .timeSeparator(.omitted)
+        )
         let url = FileManager.default.temporaryDirectory.appending(path: String(localized: "클립보드 이미지 \(stamp)") + ".\(ext)")
         do {
             try data.write(to: url)

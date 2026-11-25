@@ -47,6 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var handled: Set<UUID> = []
 
+    private var opening: [URL] = []
+    private var openingEvents = 0
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBar = MenuBarController()
         DistributedNotificationCenter.default().addObserver(
@@ -83,8 +86,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !files.isEmpty else {
             return
         }
-        ConversionInbox.shared.send(files)
-        MainWindow.show()
+        let isFirst = opening.isEmpty
+        opening += files.filter { !opening.contains($0) }
+        openingEvents += 1
+        guard isFirst else {
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [self] in
+            let files = openingEvents > 1
+                ? opening.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+                : opening
+            opening = []
+            openingEvents = 0
+            ConversionInbox.shared.send(files)
+            MainWindow.show()
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

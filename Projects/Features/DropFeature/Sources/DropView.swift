@@ -153,7 +153,19 @@ private struct EmptyScreen: View {
                         .foregroundStyle(ConvColor.errorText)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if offersSettings {
-                        Button("설정 열기") { openSettings() }
+                        // The system button style turns white on this light page in Dark Mode.
+                        Button {
+                            openSettings()
+                        } label: {
+                            Text("설정 열기")
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(ConvColor.white))
+                                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(ConvColor.ink, lineWidth: 1.5))
+                                .foregroundStyle(ConvColor.ink)
+                        }
+                        .buttonStyle(.plain)
+                        .font(ConvFont.sans(13, .semibold))
                     }
                 }
             }
