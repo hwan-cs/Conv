@@ -648,7 +648,7 @@ struct HwpBinaryReader {
             cell.row = Int(header.uint16(at: 10))
             cell.columnSpan = max(Int(header.uint16(at: 12)), 1)
             cell.rowSpan = max(Int(header.uint16(at: 14)), 1)
-            cell.width = Int(header.uint32(at: 16))
+            // Some files store a small negative size, which read unsigned makes a row tall enough to hang pagination.
             cell.width = max(Int(header.int32(at: 16)), 0)
             cell.height = max(Int(header.int32(at: 20)), 0)
             cell.padding = (Int(header.uint16(at: 24)), Int(header.uint16(at: 26)), Int(header.uint16(at: 28)), Int(header.uint16(at: 30)))
