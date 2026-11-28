@@ -1,34 +1,6 @@
 {
   "sourceLanguage" : "ko",
   "strings" : {
-    "%lld개 바꾸고 멈췄어요" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Converted %lld file, then stopped"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Converted %lld files, then stopped"
-                }
-              }
-            }
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld개 바꾸고 멈췄어요"
-          }
-        }
-      }
-    },
     "(추천)" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -229,6 +201,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@로는 합칠 수 없어요"
+          }
+        }
+      }
+    },
+    "%lld개 바꾸고 멈췄어요" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Converted %lld file, then stopped"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Converted %lld files, then stopped"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개 바꾸고 멈췄어요"
           }
         }
       }
@@ -473,23 +474,6 @@
         }
       }
     },
-    "DOCX 파일이 아니거나 손상됐어요" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Not a DOCX file, or it's damaged"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DOCX 파일이 아니거나 손상됐어요"
-          }
-        }
-      }
-    },
     "conv 열기" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -554,6 +538,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "conv에서 더 보기…"
+          }
+        }
+      }
+    },
+    "DOCX 파일이 아니거나 손상됐어요" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not a DOCX file, or it's damaged"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DOCX 파일이 아니거나 손상됐어요"
           }
         }
       }
@@ -1086,6 +1087,7 @@
       }
     },
     "멈추는 중" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2190,6 +2192,7 @@
       }
     },
     "취소됨" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2206,6 +2209,7 @@
       }
     },
     "취소했어요" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
